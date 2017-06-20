@@ -295,6 +295,7 @@ arg_parser.add_argument('--static-stdc++', dest = 'staticcxx', action = 'store_t
 arg_parser.add_argument('--static-boost', dest = 'staticboost', action = 'store_true',
                         help = 'Link with boost statically')
 add_tristate(arg_parser, name = 'hwloc', dest = 'hwloc', help = 'hwloc support')
+add_tristate(arg_parser, name = 'backtrace', dest = 'libunwind', help = 'backtrace support (provided by libunwind)')
 arg_parser.add_argument('--enable-gcc6-concepts', dest='gcc6_concepts', action='store_true', default=False,
                         help='enable experimental support for C++ Concepts as implemented in GCC 6')
 args = arg_parser.parse_args()
@@ -380,7 +381,7 @@ libs = ' '.join(['-laio',
                               '-lboost_program_options -lboost_system -lboost_filesystem'),
                  '-lstdc++ -lm',
                  maybe_static(args.staticboost, '-lboost_thread'),
-                 '-lcryptopp -lrt -lgnutls -lgnutlsxx -llz4 -lprotobuf -ldl -lgcc_s -lunwind',
+                 '-lcryptopp -lrt -lgnutls -lgnutlsxx -llz4 -lprotobuf -ldl -lgcc_s',
                  ])
 
 boost_unit_test_lib = maybe_static(args.staticboost, '-lboost_unit_test_framework')
@@ -619,6 +620,15 @@ if apply_tristate(args.hwloc, test = have_hwloc,
     libs += ' ' + hwloc_libs
     defines.append('HAVE_HWLOC')
     defines.append('HAVE_NUMA')
+
+def have_libunwind():
+    return try_compile(compiler = args.cxx, source = '#include <libunwind.h>')
+
+if apply_tristate(args.libunwind, test = have_libunwind,
+                  note = 'Note: libunwind-devel not installed.  No backtrace support.',
+                  missing = 'Error: required package libunwind-devel not installed.'):
+    libs += ' -lunwind'
+    defines.append('HAVE_LIBUNWIND')
 
 if try_compile(args.cxx, source = textwrap.dedent('''\
         #include <lz4.h>
