@@ -21,8 +21,13 @@
 
 #pragma once
 
+#ifdef HAVE_LIBUNWIND
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
+#else
+#define unw_word_t int
+#endif
+
 #include <iosfwd>
 #include <vector>
 #include <boost/container/static_vector.hpp>
@@ -32,6 +37,7 @@ namespace seastar {
 // Invokes func for each frame passing return address as argument.
 template<typename Func>
 void backtrace(Func&& func) noexcept(noexcept(func(0))) {
+#ifdef HAVE_LIBUNWIND
     unw_context_t context;
     if (unw_getcontext(&context) < 0) {
         return;
@@ -52,6 +58,7 @@ void backtrace(Func&& func) noexcept(noexcept(func(0))) {
         }
         func(ip);
     }
+#endif // HAVE_LIBUNWIND
 }
 
 class saved_backtrace {
