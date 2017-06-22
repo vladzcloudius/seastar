@@ -22,7 +22,13 @@
 #pragma once
 
 #include <atomic>
+
+#if defined(__x86_64__) || defined(__i386__)
 #include <xmmintrin.h>
+#define SEASTAR_PAUSE() _mm_pause()
+#else // PPC64
+#define SEASTAR_PAUSE() __asm__ volatile ("yield")
+#endif
 
 namespace seastar {
 
@@ -40,7 +46,7 @@ public:
     ~spinlock() { assert(!_busy.load(std::memory_order_relaxed)); }
     void lock() noexcept {
         while (_busy.exchange(true, std::memory_order_acquire)) {
-            _mm_pause();
+            SEASTAR_PAUSE();
         }
     }
     void unlock() noexcept {
