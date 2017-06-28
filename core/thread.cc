@@ -143,6 +143,7 @@ inline void jmp_buf_link::initial_switch_in_completed()
 inline void jmp_buf_link::final_switch_out()
 {
     g_current_context = link;
+    std::atomic_thread_fence(std::memory_order_release);
     longjmp(g_current_context->jmpbuf, 1);
 }
 
