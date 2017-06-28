@@ -25,6 +25,26 @@
 
 #if defined(__x86_64__) || defined(__i386__)
 #include <xmmintrin.h>
+
+#define SEASTAR_PAUSE() \
+do {                    \
+    _mm_pause();        \
+} while(0)
+
+#elif defined(__PPC__)
+
+#define SEASTAR_PAUSE()        \
+do {                           \
+    __asm__ volatile("yield"); \
+} while(0)
+
+#elif defined(__s390x__) || defined(__zarch__)
+
+// FIXME: there must be a better way
+#define SEASTAR_PAUSE() do { /* do nothing */ } while(0)
+
+#else
+#error "SEASTAR_PAUSE() is not defined for this architecture"
 #endif
 
 namespace seastar {
@@ -43,9 +63,7 @@ public:
     ~spinlock() { assert(!_busy.load(std::memory_order_relaxed)); }
     void lock() noexcept {
         while (_busy.exchange(true, std::memory_order_acquire)) {
-#if defined(__x86_64__) || defined(__i386__)
-            _mm_pause();
-#endif
+            SEASTAR_PAUSE();
         }
     }
     void unlock() noexcept {
