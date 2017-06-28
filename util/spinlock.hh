@@ -25,6 +25,19 @@
 
 #if defined(__x86_64__) || defined(__i386__)
 #include <xmmintrin.h>
+
+#define SEASTAR_PAUSE() \
+do {                    \
+    _mm_pause();        \
+} while(0)
+
+#elif defined(__PPC__)
+
+#define SEASTAR_PAUSE()        \
+do {                           \
+    __asm__ volatile("yield"); \
+} while(0)
+
 #endif
 
 namespace seastar {
@@ -43,9 +56,7 @@ public:
     ~spinlock() { assert(!_busy.load(std::memory_order_relaxed)); }
     void lock() noexcept {
         while (_busy.exchange(true, std::memory_order_acquire)) {
-#if defined(__x86_64__) || defined(__i386__)
-            _mm_pause();
-#endif
+            SEASTAR_PAUSE();
         }
     }
     void unlock() noexcept {
