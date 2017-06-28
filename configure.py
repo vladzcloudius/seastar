@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-import os, os.path, textwrap, argparse, sys, shlex, subprocess, tempfile, re
+import os, os.path, textwrap, argparse, sys, shlex, subprocess, tempfile, re, math
 
 configure_args = str.join(' ', [shlex.quote(x) for x in sys.argv[1:]])
 
@@ -178,6 +178,10 @@ def adjust_visibility_flags(compiler):
     else:
         return ''
 
+def get_page_bits():
+    pagesize = float(subprocess.check_output(['getconf', 'PAGESIZE']).strip())
+    return int(math.log(pagesize, 2))
+
 modes = {
     'debug': {
         'sanitize': '-fsanitize=address -fsanitize=leak -fsanitize=undefined',
@@ -288,6 +292,7 @@ arg_parser.add_argument('--static-stdc++', dest = 'staticcxx', action = 'store_t
                         help = 'Link libgcc and libstdc++ statically')
 arg_parser.add_argument('--static-boost', dest = 'staticboost', action = 'store_true',
                         help = 'Link with boost statically')
+arg_parser.add_argument('--page-bits', dest = 'pagebits', help = 'Memory page bits', default=get_page_bits(), type=int)
 add_tristate(arg_parser, name = 'hwloc', dest = 'hwloc', help = 'hwloc support')
 add_tristate(arg_parser, name = 'backtrace', dest = 'libunwind', help = 'backtrace support (provided by libunwind)')
 arg_parser.add_argument('--enable-gcc6-concepts', dest='gcc6_concepts', action='store_true', default=False,
@@ -590,6 +595,7 @@ tests_link_rule = 'link' if args.tests_debuginfo else 'link_stripped'
 sanitize_flags = sanitize_vptr_flag(args.cxx)
 
 visibility_flags = adjust_visibility_flags(args.cxx)
+pagebits = args.pagebits
 
 if not try_compile(args.cxx, '#include <gnutls/gnutls.h>'):
     print('Seastar requires gnutls.  Install gnutls-devel/libgnutls-dev')
@@ -716,7 +722,7 @@ with open(buildfile, 'w') as f:
         builddir = {outdir}
         cxx = {cxx}
         # we disable _FORTIFY_SOURCE because it generates false positives with longjmp() (core/thread.cc)
-        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -pthread -I. -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
+        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -DSEASTAR_PAGE_BITS={pagebits} -pthread -I. -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
         ldflags = {dbgflag} -Wl,--no-as-needed {static} {pie} -fvisibility=hidden {visibility_flags} -pthread {user_ldflags}
         libs = {libs}
         pool link_pool
@@ -806,7 +812,7 @@ with open(buildfile, 'w') as f:
                         Description: Advanced C++ framework for high-performance server applications on modern hardware.
                         Version: 1.0
                         Libs: -L{srcdir}/{builddir} -Wl,--whole-archive,-lseastar,--no-whole-archive {dbgflag} -Wl,--no-as-needed {static} {pie} -fvisibility=hidden {visibility_flags} -pthread {user_ldflags} {sanitize_libs} {libs}
-                        Cflags: -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -fvisibility=hidden -pthread -I{srcdir} -I{srcdir}/fmt -I{srcdir}/{builddir}/gen {user_cflags} {warnings} {defines} {sanitize} {opt}
+                        Cflags: -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -fvisibility=hidden -DSEASTAR_PAGE_BITS={pagebits} -pthread -I{srcdir} -I{srcdir}/fmt -I{srcdir}/{builddir}/gen {user_cflags} {warnings} {defines} {sanitize} {opt}
                         ''').format(builddir = 'build/' + mode, srcdir = os.getcwd(), **vars)
                 f.write('build $builddir/{}/{}: gen\n  text = {}\n'.format(mode, binary, repr(pc)))
             elif binary.endswith('.a'):
