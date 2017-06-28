@@ -307,6 +307,7 @@ async(thread_attributes attr, Func&& func, Args&&... args) {
             futurize<return_type>::apply(std::move(w.func), std::move(w.args)).forward_to(std::move(w.pr));
         });
         return w.th.join().then([ret = std::move(ret)] () mutable {
+            std::atomic_thread_fence(std::memory_order_acquire);
             return std::move(ret);
         });
     });
