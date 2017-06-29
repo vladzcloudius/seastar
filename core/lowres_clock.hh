@@ -22,6 +22,7 @@
 #pragma once
 
 #include "timer.hh"
+#include "core/memory.hh"
 
 #include <cstdint>
 
