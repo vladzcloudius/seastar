@@ -63,7 +63,7 @@ namespace memory {
 
 static constexpr size_t page_size = SEASTAR_INTERNAL_ALLOCATOR_PAGE_SIZE;
 static constexpr size_t page_bits = log2ceil(page_size);
-static constexpr size_t huge_page_size = 1 << 21; // 2M
+static constexpr size_t huge_page_size = SEASTAR_HUGE_PAGE_SIZE;
 
 void configure(std::vector<resource::memory> m, bool mbind,
         std::experimental::optional<std::string> hugetlbfs_path = {});
