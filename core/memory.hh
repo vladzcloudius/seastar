@@ -55,7 +55,7 @@ namespace memory {
 /// \cond internal
 static constexpr size_t page_bits = SEASTAR_PAGE_BITS;
 static constexpr size_t page_size = 1 << page_bits;
-static constexpr size_t huge_page_size = 512 * page_size; // FIXME: PPC64 uses 16MB huge pages and 64K PAGESIZE, which gives huge_page_size = 256 * page_size
+static constexpr size_t huge_page_size = SEASTAR_HUGE_PAGE_SIZE
 
 void configure(std::vector<resource::memory> m, bool mbind,
         std::experimental::optional<std::string> hugetlbfs_path = {});
