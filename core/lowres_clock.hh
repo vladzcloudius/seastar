@@ -23,6 +23,7 @@
 
 #include "cacheline.hh"
 #include "timer.hh"
+#include "core/memory.hh"
 
 #include <cstdint>
 
