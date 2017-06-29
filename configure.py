@@ -313,6 +313,7 @@ arg_parser.add_argument('--static-stdc++', dest = 'staticcxx', action = 'store_t
                         help = 'Link libgcc and libstdc++ statically')
 arg_parser.add_argument('--static-boost', dest = 'staticboost', action = 'store_true',
                         help = 'Link with boost statically')
+arg_parser.add_argument('--huge-page-size-mb', dest = 'huge_page_size_mb', help = 'Huge page size in MB', type=int, default=2)
 add_tristate(arg_parser, name = 'hwloc', dest = 'hwloc', help = 'hwloc support')
 arg_parser.add_argument('--enable-gcc6-concepts', dest='gcc6_concepts', action='store_true', default=False,
                         help='enable experimental support for C++ Concepts as implemented in GCC 6')
@@ -643,6 +644,7 @@ tests_link_rule = 'link' if args.tests_debuginfo else 'link_stripped'
 sanitize_flags = sanitize_vptr_flag(args.cxx)
 
 visibility_flags = adjust_visibility_flags(args.cxx)
+huge_page_size = args.huge_page_size_mb * 1024 * 1024
 
 if not try_compile(args.cxx, '#include <gnutls/gnutls.h>'):
     print('Seastar requires gnutls.  Install gnutls-devel/libgnutls-dev')
@@ -769,7 +771,7 @@ with open(buildfile, 'w') as f:
         full_builddir = {srcdir}/$builddir
         cxx = {cxx}
         # we disable _FORTIFY_SOURCE because it generates false positives with longjmp() (core/thread.cc)
-        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -pthread -I{srcdir} -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
+        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -DSEASTAR_HUGE_PAGE_SIZE={huge_page_size} -pthread -I{srcdir} -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
         ldflags = {dbgflag} -Wl,--no-as-needed {static} {pie} -fvisibility=hidden {visibility_flags} -pthread {user_ldflags}
         libs = {libs}
         pool link_pool
