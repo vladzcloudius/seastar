@@ -71,7 +71,7 @@ public:
 private:
     // Both counters are updated by cpu0 and read by other cpus. Place them on their own cache line to avoid false
     // sharing.
-    struct alignas(64) counters final {
+    struct alignas(seastar::memory::cache_line_size) counters final {
         static std::atomic<steady_rep> _steady_now;
         static std::atomic<system_rep> _system_now;
     };

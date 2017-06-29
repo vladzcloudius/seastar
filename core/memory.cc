@@ -140,7 +140,6 @@ static void on_allocation_failure(size_t size);
 
 static constexpr unsigned cpu_id_shift = 36; // FIXME: make dynamic
 static constexpr unsigned max_cpus = 256;
-static constexpr size_t cache_line_size = SEASTAR_CACHE_LINE_SIZE;
 
 using pageidx = uint32_t;
 
