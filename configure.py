@@ -303,6 +303,7 @@ arg_parser.add_argument('--static-boost', dest = 'staticboost', action = 'store_
                         help = 'Link with boost statically')
 arg_parser.add_argument('--page-bits', dest = 'pagebits', help = 'Memory page bits', default=get_page_bits(), type=int)
 arg_parser.add_argument('--cache-line-size', dest = 'cache_line_size', help = 'CPU cache line size', default=get_cache_line_size(), type=int)
+arg_parser.add_argument('--huge-page-size-mb', dest = 'huge_page_size_mb', help = 'Huge page size in MB', type=int, default=2)
 add_tristate(arg_parser, name = 'hwloc', dest = 'hwloc', help = 'hwloc support')
 add_tristate(arg_parser, name = 'backtrace', dest = 'libunwind', help = 'backtrace support (provided by libunwind)')
 arg_parser.add_argument('--enable-gcc6-concepts', dest='gcc6_concepts', action='store_true', default=False,
@@ -607,6 +608,7 @@ sanitize_flags = sanitize_vptr_flag(args.cxx)
 visibility_flags = adjust_visibility_flags(args.cxx)
 pagebits = args.pagebits
 cache_line_size = args.cache_line_size
+huge_page_size = args.huge_page_size_mb * 1024 * 1024
 
 if not try_compile(args.cxx, '#include <gnutls/gnutls.h>'):
     print('Seastar requires gnutls.  Install gnutls-devel/libgnutls-dev')
@@ -734,7 +736,7 @@ with open(buildfile, 'w') as f:
         full_builddir = {srcdir}/$builddir
         cxx = {cxx}
         # we disable _FORTIFY_SOURCE because it generates false positives with longjmp() (core/thread.cc)
-        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -DSEASTAR_PAGE_BITS={pagebits} -DSEASTAR_CACHE_LINE_SIZE={cache_line_size} -pthread -I{srcdir} -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
+        cxxflags = -std=gnu++1y {dbgflag} {fpie} -Wall -Werror -Wno-error=deprecated-declarations -fvisibility=hidden {visibility_flags} -DSEASTAR_PAGE_BITS={pagebits} -DSEASTAR_CACHE_LINE_SIZE={cache_line_size} -DSEASTAR_HUGE_PAGE_SIZE={huge_page_size} -pthread -I{srcdir} -U_FORTIFY_SOURCE {user_cflags} {warnings} {defines}
         ldflags = {dbgflag} -Wl,--no-as-needed {static} {pie} -fvisibility=hidden {visibility_flags} -pthread {user_ldflags}
         libs = {libs}
         pool link_pool
