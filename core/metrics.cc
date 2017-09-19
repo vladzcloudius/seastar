@@ -261,7 +261,6 @@ foreign_ptr<values_reference> get_values() {
         }
         mv.emplace_back(std::move(values));
     }
-    std::atomic_thread_fence(std::memory_order_release);
     return res_ref;
 }
 

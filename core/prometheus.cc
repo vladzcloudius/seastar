@@ -118,7 +118,6 @@ static future<> get_map_value(metrics_families_per_shard& vec) {
         return smp::submit_to(cpu, [] {
             return mi::get_values();
         }).then([&vec, cpu] (auto res) {
-            std::atomic_thread_fence(std::memory_order_acquire);
             vec[cpu] = std::move(res);
         });
     });
