@@ -24,11 +24,9 @@
 namespace seastar {
 
 /// \cond internal
-
 // cause all threads to invoke a full memory barrier
 void systemwide_memory_barrier();
-
-
+void init_membarrier();
 /// \endcond
 
 }
