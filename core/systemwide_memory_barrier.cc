@@ -20,47 +20,16 @@
  */
 
 #include "systemwide_memory_barrier.hh"
-#include "cacheline.hh"
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cassert>
-#include <sys/syscall.h>
-#include <linux/membarrier.h>
 
 namespace seastar {
-static alignas(seastar::cache_line_size) bool sys_membarrier_is_available = false;
-
-static int membarrier(int cmd, int flags) {
-    return syscall(__NR_membarrier, cmd, flags);
-}
-
-void init_membarrier() {
-    int ret;
-
-    /* Check that membarrier() is supported. */
-    ret = membarrier(MEMBARRIER_CMD_QUERY, 0);
-    if (ret < 0) {
-        sys_membarrier_is_available = false;
-        return;
-    }
-
-    if (!(ret & MEMBARRIER_CMD_SHARED)) {
-        sys_membarrier_is_available = false;
-        return;
-    }
-
-    sys_membarrier_is_available = true;
-}
 
 // cause all threads to invoke a full memory barrier
 void
 systemwide_memory_barrier() {
-    if (sys_membarrier_is_available) {
-        int r = membarrier(MEMBARRIER_CMD_SHARED, 0);
-        assert(r == 0);
-        return;
-    }
-
+    // FIXME: use sys_membarrier() when available
     static thread_local char* mem = [] {
        void* mem = mmap(nullptr, getpagesize(),
                PROT_READ | PROT_WRITE,
@@ -80,5 +49,6 @@ systemwide_memory_barrier() {
     int r2 = mprotect(mem, getpagesize(), PROT_READ);
     assert(r2 == 0);
 }
+
 }
 
