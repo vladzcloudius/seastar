@@ -21,6 +21,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/thread.hpp>
 #include <regex>
 #include "resource.hh"
 #include "core/align.hh"
@@ -273,7 +274,7 @@ resources allocate(configuration c) {
     auto machine = hwloc_get_obj_by_depth(topology, machine_depth, 0);
     auto available_memory = machine->memory.total_memory;
     size_t mem = calculate_memory(c, available_memory);
-    unsigned available_procs = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+    unsigned available_procs = boost::thread::hardware_concurrency();
     unsigned procs = c.cpus.value_or(available_procs);
     if (procs > available_procs) {
         throw std::runtime_error("insufficient processing units");
