@@ -94,16 +94,8 @@ if __name__ == "__main__":
     black_hole = open('/dev/null', 'w')
     print_status = print_status_verbose if args.verbose else print_status_short
 
-    # total memory
-    meminfo = dict((i.split()[0].rstrip(':'),int(i.split()[1])) for i in open('/proc/meminfo').readlines())
-    mem_gb = int(meminfo['MemTotal'] / 1024)
-
-    # total CPUs
-    cpu_count = multiprocessing.cpu_count()
-
-    # give at least 1GB for each shard
-    cpu_count = min(cpu_count, mem_gb)
-
+    # Run on 2 shard - it should be enough
+    cpu_count = 2
 
     test_to_run = []
     modes_to_run = all_modes if not args.mode else [args.mode]
@@ -114,7 +106,7 @@ if __name__ == "__main__":
         for test in boost_tests:
             test_to_run.append((os.path.join(prefix, test),'boost'))
         test_to_run.append(('tests/memcached/test.py --mode ' + mode + (' --fast' if args.fast else ''),'other'))
-        test_to_run.append((os.path.join(prefix, 'distributed_test') + ' -c 2','other'))
+        test_to_run.append((os.path.join(prefix, 'distributed_test'),'other'))
 
 
         allocator_test_path = os.path.join(prefix, 'allocator_test')
@@ -159,7 +151,7 @@ if __name__ == "__main__":
             if not re.search("tests/memcached/test.py", path):
                 if re.search("allocator_test", path) or re.search("fair_queue_test", path):
                     path = path + " -- --smp={}".format(cpu_count)
-                elif not re.search("distributed_test:", path):
+                else:
                     path = path + " --smp={}".format(cpu_count)
 
         proc = subprocess.Popen(path.split(' '), stdout=outf, stderr=subprocess.PIPE, env=env,preexec_fn=os.setsid)
