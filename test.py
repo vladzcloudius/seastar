@@ -19,6 +19,7 @@
 import os
 import sys
 import argparse
+import multiprocessing
 import subprocess
 import signal
 import re
@@ -93,6 +94,17 @@ if __name__ == "__main__":
     black_hole = open('/dev/null', 'w')
     print_status = print_status_verbose if args.verbose else print_status_short
 
+    # total memory
+    meminfo = dict((i.split()[0].rstrip(':'),int(i.split()[1])) for i in open('/proc/meminfo').readlines())
+    mem_gb = int(meminfo['MemTotal'] / 1024)
+
+    # total CPUs
+    cpu_count = multiprocessing.cpu_count()
+
+    # give at least 1GB for each shard
+    cpu_count = min(cpu_count, mem_gb)
+
+
     test_to_run = []
     modes_to_run = all_modes if not args.mode else [args.mode]
     for mode in modes_to_run:
@@ -139,6 +151,16 @@ if __name__ == "__main__":
         if os.path.isfile('tmp.out'):
            os.remove('tmp.out')
         outf=open('tmp.out','w')
+
+        # Limit shards count
+        if test[1] == 'boost':
+            path = path + " -- --smp={cpu_count}"
+        else:
+            if re.search("allocator_test", path) or re.search("fair_queue_test", path):
+                path = path + " -- --smp={cpu_count}"
+            else:
+                path = path + " --smp={cpu_count}"
+
         proc = subprocess.Popen(path.split(' '), stdout=outf, stderr=subprocess.PIPE, env=env,preexec_fn=os.setsid)
         signal.alarm(args.timeout)
         err = None
