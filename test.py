@@ -156,10 +156,11 @@ if __name__ == "__main__":
         if test[1] == 'boost':
             path = path + " -- --smp={}".format(cpu_count)
         else:
-            if re.search("allocator_test", path) or re.search("fair_queue_test", path):
-                path = path + " -- --smp={}".format(cpu_count)
-            else:
-                path = path + " --smp={}".format(cpu_count)
+            if not re.search("tests/memcached/test.py", path):
+                if re.search("allocator_test", path) or re.search("fair_queue_test", path):
+                    path = path + " -- --smp={}".format(cpu_count)
+                elif not re.search("distributed_test:", path):
+                    path = path + " --smp={}".format(cpu_count)
 
         proc = subprocess.Popen(path.split(' '), stdout=outf, stderr=subprocess.PIPE, env=env,preexec_fn=os.setsid)
         signal.alarm(args.timeout)
