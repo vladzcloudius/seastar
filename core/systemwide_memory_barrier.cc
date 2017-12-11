@@ -23,12 +23,16 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cassert>
+#include <syscall.h>
+
+#define MEMBARRIER_CMD_PRIVATE_EXPEDITED (1 << 3)
 
 namespace seastar {
 
 // cause all threads to invoke a full memory barrier
 void
 systemwide_memory_barrier() {
+#ifndef __aarch64__
     // FIXME: use sys_membarrier() when available
     static thread_local char* mem = [] {
        void* mem = mmap(nullptr, getpagesize(),
@@ -48,6 +52,9 @@ systemwide_memory_barrier() {
     // FIXME: does this work on ARM?
     int r2 = mprotect(mem, getpagesize(), PROT_READ);
     assert(r2 == 0);
+#else
+    assert(syscall(__NR_membarrier, MEMBARRIER_CMD_PRIVATE_EXPEDITED, 0) == 0);
+#endif
 }
 
 }

@@ -39,7 +39,7 @@ inline void cpu_relax() {
     _mm_pause();
 }
 
-#elif defined(__PPC__)
+#elif defined(__PPC__) || defined(__aarch64__)
 
 [[gnu::always_inline]]
 inline void cpu_relax() {
@@ -51,13 +51,11 @@ inline void cpu_relax() {
 // FIXME: there must be a better way
 [[gnu::always_inline]]
 inline void cpu_relax() {}
-
 #else
 
 [[gnu::always_inline]]
 inline void cpu_relax() {}
 #warn "Using an empty cpu_relax() for this architecture"
-
 #endif
 
 
