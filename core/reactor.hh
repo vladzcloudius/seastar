@@ -980,6 +980,7 @@ public:
     steady_clock_type::duration total_busy_time();
 
     const io_stats& get_io_stats() const { return _io_stats; }
+    double get_load() const noexcept { return _load; }
 #ifdef HAVE_OSV
     void timer_thread_func();
     void set_timer(sched::timer &tmr, s64 t);
