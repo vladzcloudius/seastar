@@ -313,6 +313,8 @@ arg_parser.add_argument('--static-stdc++', dest = 'staticcxx', action = 'store_t
                         help = 'Link libgcc and libstdc++ statically')
 arg_parser.add_argument('--static-boost', dest = 'staticboost', action = 'store_true',
                         help = 'Link with boost statically')
+arg_parser.add_argument('--static-yaml-cpp', dest = 'staticyamlcpp', action = 'store_true',
+            help = 'Link libyaml-cpp statically')
 add_tristate(arg_parser, name = 'hwloc', dest = 'hwloc', help = 'hwloc support')
 arg_parser.add_argument('--enable-gcc6-concepts', dest='gcc6_concepts', action='store_true', default=False,
                         help='enable experimental support for C++ Concepts as implemented in GCC 6')
@@ -408,7 +410,8 @@ libs = ' '.join(['-laio',
                               '-lboost_program_options -lboost_system -lboost_filesystem'),
                  '-lstdc++ -lm',
                  maybe_static(args.staticboost, '-lboost_thread'),
-                 '-lcryptopp -lrt -lgnutls -lgnutlsxx -llz4 -lprotobuf -ldl -lgcc_s -lunwind',
+                 '-lcryptopp -lrt -lgnutls -lgnutlsxx -llz4 -lprotobuf -ldl -lgcc_s -lunwind ',
+                 maybe_static(args.staticyamlcpp, '-lyaml-cpp'),
                  ])
 
 boost_unit_test_lib = maybe_static(args.staticboost, '-lboost_unit_test_framework')
@@ -868,7 +871,7 @@ with open(buildfile, 'w') as f:
                 f.write('build $builddir/{}/{}: ar.{} {}\n'.format(mode, binary, mode, str.join(' ', objs)))
             else:
                 libdeps = str.join(' ', ('$builddir/{}/{}'.format(mode, i) for i in built_libs))
-                extralibs = []
+                extralibs = [maybe_static(args.staticyamlcpp, '-lyaml-cpp')]
                 if binary.startswith('tests/'):
                     if binary in boost_tests:
                         extralibs += [maybe_static(args.staticboost, '-lboost_unit_test_framework')]
