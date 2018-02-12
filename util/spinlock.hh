@@ -39,7 +39,7 @@ inline void cpu_relax() {
     _mm_pause();
 }
 
-#elif defined(__PPC__)
+#elif defined(__PPC__) || defined(__aarch64__)
 
 [[gnu::always_inline]]
 inline void cpu_relax() {
