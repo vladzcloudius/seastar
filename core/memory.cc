@@ -140,7 +140,7 @@ static allocation_site_ptr get_allocation_site() __attribute__((unused));
 
 static void on_allocation_failure(size_t size);
 
-static constexpr unsigned cpu_id_shift = 33; // FIXME: make dynamic
+static constexpr unsigned cpu_id_shift = 36; // FIXME: make dynamic
 static constexpr unsigned max_cpus = 256;
 
 using pageidx = uint32_t;
@@ -178,7 +178,7 @@ static char* mem_base() {
     static char* known;
     static std::once_flag flag;
     std::call_once(flag, [] {
-        size_t alloc = size_t(1) << 41;
+        size_t alloc = size_t(1) << 44;
         auto r = ::mmap(NULL, 2 * alloc,
                     PROT_NONE,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
