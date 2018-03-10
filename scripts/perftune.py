@@ -481,17 +481,24 @@ class NetPerfTuner(PerfTunerBase):
         """
         Return the HW queue index for a given IRQ for Intel NICs.
 
-        Intel's IRQs have the following name convention: <bla-bla>-TxRx-<queue index>
+        Intel's fast path IRQs have the following name convention:
+             <bla-bla>-TxRx-<queue index>
+
+        Intel NICs also have the IRQ for flow-director which name looks like this:
+             <bla-bla>:fdir-TxRx-<index>
 
         :param irq: IRQ number
         :return: HW queue index for Intel NICs and 0 for all other NICs
         """
-        intel_fp_irq_re = re.compile("\-TxRx\-(\d+)")
+        intel_fp_irq_re = re.compile(".*\-TxRx\-(\d+)")
+        fdir_re = re.compile(".*fdir-TxRx-\d+")
+
         m = intel_fp_irq_re.match(self.__irqs2procline[irq])
-        if m:
+        m1 = fdir_re.match(self.__irqs2procline[irq])
+        if m and not m1:
             return int(m.group(1))
         else:
-            return 0
+            return sys.maxsize
 
     def __learn_irqs_one(self, iface):
         """
@@ -521,7 +528,7 @@ class NetPerfTuner(PerfTunerBase):
         fp_irqs_re = re.compile("\-TxRx\-|\-fp\-|\-Tx\-Rx\-")
         irqs = list(filter(lambda irq : fp_irqs_re.search(self.__irqs2procline[irq]), all_irqs))
         if irqs:
-            irqs.sort(self.__intel_irq_to_queue_idx)
+            irqs.sort(key=self.__intel_irq_to_queue_idx)
             return irqs
         else:
             return list(all_irqs)
