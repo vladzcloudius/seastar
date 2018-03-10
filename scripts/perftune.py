@@ -347,6 +347,7 @@ class NetPerfTuner(PerfTunerBase):
         # check that self.nic is either a HW device or a bonding interface
         self.__check_nic()
 
+        self.__irqs2procline = get_irqs2procline_map()
         self.__nic2irqs = self.__learn_irqs()
 
 #### Public methods ############################
@@ -476,6 +477,22 @@ class NetPerfTuner(PerfTunerBase):
 
         return []
 
+    def __intel_irq_to_queue_idx(self, irq):
+        """
+        Return the HW queue index for a given IRQ for Intel NICs.
+
+        Intel's IRQs have the following name convention: <bla-bla>-TxRx-<queue index>
+
+        :param irq: IRQ number
+        :return: HW queue index for Intel NICs and 0 for all other NICs
+        """
+        intel_fp_irq_re = re.compile("\-TxRx\-(\d+)")
+        m = intel_fp_irq_re.match(self.__irqs2procline[irq])
+        if m:
+            return int(m.group(1))
+        else:
+            return 0
+
     def __learn_irqs_one(self, iface):
         """
         This is a slow method that is going to read from the system files. Never
@@ -495,13 +512,16 @@ class NetPerfTuner(PerfTunerBase):
         this means that the given NIC uses a different IRQs naming pattern. In this case we won't filter any IRQ.
 
         Otherwise, we will use only IRQs which names fit one of the patterns above.
+
+        For NICs with a limited number of Rx queues the IRQs that handle Rx are going to be at the beginning of the
+        list.
         """
-        irqs2procline = get_irqs2procline_map()
         # filter 'all_irqs' to only reference valid keys from 'irqs2procline' and avoid an IndexError on the 'irqs' search below
-        all_irqs = set(learn_all_irqs_one("/sys/class/net/{}/device".format(iface), irqs2procline, iface)).intersection(irqs2procline.keys())
+        all_irqs = set(learn_all_irqs_one("/sys/class/net/{}/device".format(iface), self.__irqs2procline, iface)).intersection(self.__irqs2procline.keys())
         fp_irqs_re = re.compile("\-TxRx\-|\-fp\-|\-Tx\-Rx\-")
-        irqs = list(filter(lambda irq : fp_irqs_re.search(irqs2procline[irq]), all_irqs))
+        irqs = list(filter(lambda irq : fp_irqs_re.search(self.__irqs2procline[irq]), all_irqs))
         if irqs:
+            irqs.sort(self.__intel_irq_to_queue_idx)
             return irqs
         else:
             return list(all_irqs)
@@ -527,8 +547,21 @@ class NetPerfTuner(PerfTunerBase):
         return glob.glob("/sys/class/net/{}/queues/*/rps_cpus".format(iface))
 
     def __setup_one_hw_iface(self, iface):
+        max_num_rx_queues = self.__max_rx_queue_count(iface)
+        all_irqs = self.__get_irqs_one(iface)
+
         # Bind the NIC's IRQs according to the configuration mode
-        distribute_irqs(self.__get_irqs_one(iface), self.irqs_cpu_mask)
+        #
+        # If this NIC has a limited number of Rx queues then we want to distribute their IRQs separately.
+        # For such NICs we sorted IRQs list to have Rx queues at the beginning.
+        if max_num_rx_queues < len(all_irqs):
+            num_rx_queues = self.__get_rx_queue_count(iface)
+            print("Distributing IRQs handling Rx:")
+            distribute_irqs(all_irqs[0:num_rx_queues], self.irqs_cpu_mask)
+            print("Distributing the rest of IRQs")
+            distribute_irqs(all_irqs[num_rx_queues:], self.irqs_cpu_mask)
+        else:
+            distribute_irqs(all_irqs, self.irqs_cpu_mask)
 
         self.__setup_rps(iface, self.compute_cpu_mask)
         self.__setup_xps(iface)
