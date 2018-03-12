@@ -2120,13 +2120,14 @@ blockdev_file_impl::size(void) {
 
 subscription<directory_entry>
 posix_file_impl::list_directory(std::function<future<> (directory_entry de)> next) {
+    static constexpr size_t buffer_size = 8192;
     struct work {
         stream<directory_entry> s;
         unsigned current = 0;
         unsigned total = 0;
         bool eof = false;
         int error = 0;
-        char buffer[8192];
+        char buffer[buffer_size];
     };
 
     // While it would be natural to use fdopendir()/readdir(),
@@ -2150,7 +2151,7 @@ posix_file_impl::list_directory(std::function<future<> (directory_entry de)> nex
         return do_until(eofcond, [w, this] {
             if (w->current == w->total) {
                 return engine()._thread_pool.submit<syscall_result<long>>([w , this] () {
-                    auto ret = ::syscall(__NR_getdents64, _fd, reinterpret_cast<linux_dirent64*>(w->buffer), sizeof(w->buffer));
+                    auto ret = ::syscall(__NR_getdents64, _fd, reinterpret_cast<linux_dirent64*>(w->buffer), buffer_size);
                     return wrap_syscall(ret);
                 }).then([w] (syscall_result<long> ret) {
                     ret.throw_if_error();
@@ -2165,7 +2166,7 @@ posix_file_impl::list_directory(std::function<future<> (directory_entry de)> nex
             auto start = w->buffer + w->current;
             auto de = reinterpret_cast<linux_dirent64*>(start);
             std::experimental::optional<directory_entry_type> type;
-            switch (start[de->d_reclen - 1]) {
+            switch (de->d_type) {
             case DT_BLK:
                 type = directory_entry_type::block_device;
                 break;
