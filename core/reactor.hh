@@ -1051,6 +1051,7 @@ private:
     void del_timer(timer<manual_clock>*);
 
     future<> run_exit_tasks();
+    void stop_task_quota_timer_thread();
     void stop();
     friend class pollable_fd;
     friend class pollable_fd_state;

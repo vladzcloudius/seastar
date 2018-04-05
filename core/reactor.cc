@@ -471,14 +471,6 @@ reactor::reactor(unsigned id)
 }
 
 reactor::~reactor() {
-    sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, block_notifier_signal());
-    auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
-    assert(r == 0);
-
-    _dying.store(true, std::memory_order_relaxed);
-    _task_quota_timer_thread.join();
     timer_delete(_steady_clock_timer);
     auto eraser = [](auto& list) {
         while (!list.empty()) {
@@ -2353,10 +2345,22 @@ void reactor::at_exit(std::function<future<> ()> func) {
     _exit_funcs.push_back(std::move(func));
 }
 
+void reactor::stop_task_quota_timer_thread() {
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, block_notifier_signal());
+    auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    assert(r == 0);
+
+    _dying.store(true, std::memory_order_relaxed);
+    _task_quota_timer_thread.join();
+}
+
 future<> reactor::run_exit_tasks() {
     _stop_requested.broadcast();
     _stopping = true;
     stop_aio_eventfd_loop();
+    stop_task_quota_timer_thread();
     return do_for_each(_exit_funcs.rbegin(), _exit_funcs.rend(), [] (auto& func) {
         return func();
     });
