@@ -471,14 +471,6 @@ reactor::reactor(unsigned id)
 }
 
 reactor::~reactor() {
-    sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, block_notifier_signal());
-    auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
-    assert(r == 0);
-
-    _dying.store(true, std::memory_order_relaxed);
-    _task_quota_timer_thread.join();
     timer_delete(_steady_clock_timer);
     auto eraser = [](auto& list) {
         while (!list.empty()) {
@@ -2366,6 +2358,15 @@ void reactor::stop() {
     assert(engine()._id == 0);
     smp::cleanup_cpu();
     if (!_stopping) {
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, block_notifier_signal());
+        auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
+        assert(r == 0);
+
+        _dying.store(true, std::memory_order_relaxed);
+        _task_quota_timer_thread.join();
+
         run_exit_tasks().then([this] {
             do_with(semaphore(0), [this] (semaphore& sem) {
                 for (unsigned i = 1; i < smp::count; i++) {
