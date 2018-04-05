@@ -107,6 +107,7 @@
 #include "core/metrics.hh"
 #include "execution_stage.hh"
 #include "exception_hacks.hh"
+#include "sleep.hh"
 
 namespace seastar {
 
@@ -593,6 +594,8 @@ reactor::task_quota_timer_thread_fn() {
         // a signal fence is overdoing it
         std::atomic_signal_fence(std::memory_order_seq_cst);
     }
+
+    _task_quota_timer_thread_stopped.store(true, std::memory_order_release);
 }
 
 void
@@ -2345,12 +2348,28 @@ void reactor::at_exit(std::function<future<> ()> func) {
     _exit_funcs.push_back(std::move(func));
 }
 
+future<> reactor::stop_task_quota_timer_thread() {
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, block_notifier_signal());
+    auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    assert(r == 0);
+
+    _dying.store(true, std::memory_order_relaxed);
+    return do_until(
+            [this] { return _task_quota_timer_thread_stopped.load(std::memory_order_acquire); },
+            [] { return seastar::sleep_abortable(1ms); }
+    );
+}
+
 future<> reactor::run_exit_tasks() {
     _stop_requested.broadcast();
     _stopping = true;
     stop_aio_eventfd_loop();
-    return do_for_each(_exit_funcs.rbegin(), _exit_funcs.rend(), [] (auto& func) {
-        return func();
+    return stop_task_quota_timer_thread().finally([this] {
+        return do_for_each(_exit_funcs.rbegin(), _exit_funcs.rend(), [] (auto& func) {
+            return func();
+        });
     });
 }
 
@@ -2358,15 +2377,6 @@ void reactor::stop() {
     assert(engine()._id == 0);
     smp::cleanup_cpu();
     if (!_stopping) {
-        sigset_t mask;
-        sigemptyset(&mask);
-        sigaddset(&mask, block_notifier_signal());
-        auto r = ::pthread_sigmask(SIG_BLOCK, &mask, NULL);
-        assert(r == 0);
-
-        _dying.store(true, std::memory_order_relaxed);
-        _task_quota_timer_thread.join();
-
         run_exit_tasks().then([this] {
             do_with(semaphore(0), [this] (semaphore& sem) {
                 for (unsigned i = 1; i < smp::count; i++) {

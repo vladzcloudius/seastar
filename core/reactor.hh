@@ -810,6 +810,7 @@ private:
     bool& _local_need_preempt{g_need_preempt}; // for access from the _task_quota_timer_thread
     std::thread _task_quota_timer_thread;
     std::atomic<bool> _dying{false};
+    std::atomic<bool> _task_quota_timer_thread_stopped{false};
 private:
     static std::chrono::nanoseconds calculate_poll_time();
     static void block_notifier(int);
@@ -1051,6 +1052,7 @@ private:
     void del_timer(timer<manual_clock>*);
 
     future<> run_exit_tasks();
+    future<> stop_task_quota_timer_thread();
     void stop();
     friend class pollable_fd;
     friend class pollable_fd_state;
