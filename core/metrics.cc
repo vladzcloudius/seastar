@@ -21,6 +21,7 @@
 
 #include "metrics.hh"
 #include "metrics_api.hh"
+#include "thread.hh"
 #include <boost/range/algorithm.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -255,9 +256,11 @@ foreign_ptr<values_reference> get_values() {
     auto & functions = get_local_impl()->functions();
     mv.reserve(functions.size());
     for (auto&& i : functions) {
+        thread::yield_if_should();
         value_vector values;
         values.reserve(i.size());
         for (auto&& v : i) {
+            thread::yield_if_should();
             values.emplace_back(v());
         }
         mv.emplace_back(std::move(values));
