@@ -195,6 +195,10 @@ public:
     /// Gives other threads/fibers a chance to run on current CPU.
     /// The current thread will resume execution promptly.
     static void yield();
+
+    /// \brief Defer execution of the current thread if thread::should_yiled() returns TRUE.
+    static void yield_if_should();
+
     /// \brief Checks whether this thread ought to call yield() now.
     ///
     /// Useful where we cannot call yield() immediately because we
