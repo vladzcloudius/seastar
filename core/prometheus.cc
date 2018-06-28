@@ -29,6 +29,7 @@
 #include "scollectd-impl.hh"
 #include "metrics_api.hh"
 #include "http/function_handlers.hh"
+#include "thread.hh"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/algorithm/string.hpp>
@@ -41,6 +42,12 @@ namespace prometheus {
 namespace pm = io::prometheus::client;
 
 namespace mi = metrics::impl;
+
+static void yield_cond() {
+    if (need_preempt()) {
+        seastar::thread::yield();
+    }
+}
 
 /**
  * Taken from an answer in stackoverflow:
@@ -147,6 +154,7 @@ static void add_name(std::ostream& s, const sstring& name, const std::map<sstrin
     s << name << "{instance=\"" << ctx.hostname << '"';
     if (!labels.empty()) {
         for (auto l : labels) {
+            yield_cond();
             s << "," << l.first  << "=\"" << l.second << '"';
         }
     }
@@ -444,6 +452,7 @@ public:
     void foreach_metric(std::function<void(const mi::metric_value&, const mi::metric_info&)>&& f) {
         // iterating over the shard vector and the position vector
         for (auto&& i : boost::combine(_positions, _families)) {
+            yield_cond();
             auto& pos_in_metric_per_shard = boost::get<0>(i);
             auto& metric_family = boost::get<1>(i);
             if (pos_in_metric_per_shard >= metric_family->metadata->size()) {
@@ -457,6 +466,7 @@ public:
                 const mi::value_vector& values = metric_family->values[pos_in_metric_per_shard];
                 const mi::metric_metadata_vector& metrics_metadata = metadata.metrics;
                 for (auto&& vm : boost::combine(values, metrics_metadata)) {
+                    yield_cond();
                     auto& value = boost::get<0>(vm);
                     auto& metric_metadata = boost::get<1>(vm);
                     f(value, metric_metadata);
@@ -546,9 +556,10 @@ metric_family_range get_range(const metrics_families_per_shard& mf, const sstrin
 }
 
 future<> write_text_representation(output_stream<char>& out, const config& ctx, metric_family_range& m) {
-    return do_with(false,
-            [&ctx, &out, &m](auto& found) mutable {
-        return do_for_each(m, [&out, &found, &ctx] (metric_family& metric_family) mutable {
+    return seastar::async([&] () {
+        bool found = false;
+
+        std::for_each(m.begin(), m.end(), [&out, &found, &ctx] (metric_family& metric_family) mutable {
             std::stringstream s;
             auto name = ctx.prefix + "_" + metric_family.name();
             found = false;
@@ -567,7 +578,8 @@ future<> write_text_representation(output_stream<char>& out, const config& ctx, 
                     uint64_t count = 0;
                     auto bucket = name + "_bucket";
                     for (auto  i : h.buckets) {
-                         le = std::to_string(i.upper_bound);
+                        yield_cond();
+                        le = std::to_string(i.upper_bound);
                         count += i.count;
                         add_name(s, bucket, labels, ctx);
                         s << count;
@@ -591,7 +603,10 @@ future<> write_text_representation(output_stream<char>& out, const config& ctx, 
                     s << "\n";
                 }
             });
-            return out.write(s.str());
+
+            yield_cond();
+            out.write(s.str()).get();
+            yield_cond();
         });
     });
 }
