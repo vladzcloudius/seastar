@@ -249,25 +249,23 @@ const value_map& get_value_map() {
 }
 
 foreign_ptr<values_reference> get_values() {
-    return async([] {
-        shared_ptr<values_copy> res_ref = ::seastar::make_shared<values_copy>();
-        auto& res = *(res_ref.get());
-        auto& mv = res.values;
-        res.metadata = get_local_impl()->metadata();
-        auto & functions = get_local_impl()->functions();
-        mv.reserve(functions.size());
-        for (auto&& i : functions) {
+    shared_ptr<values_copy> res_ref = ::seastar::make_shared<values_copy>();
+    auto& res = *(res_ref.get());
+    auto& mv = res.values;
+    res.metadata = get_local_impl()->metadata();
+    auto & functions = get_local_impl()->functions();
+    mv.reserve(functions.size());
+    for (auto&& i : functions) {
+        thread::yield_if_should();
+        value_vector values;
+        values.reserve(i.size());
+        for (auto&& v : i) {
             thread::yield_if_should();
-            value_vector values;
-            values.reserve(i.size());
-            for (auto&& v : i) {
-                thread::yield_if_should();
-                values.emplace_back(v());
-            }
-            mv.emplace_back(std::move(values));
+            values.emplace_back(v());
         }
-        return res_ref;
-    });
+        mv.emplace_back(std::move(values));
+    }
+    return res_ref;
 }
 
 
