@@ -358,7 +358,7 @@ bool thread::should_yield() {
 }
 
 void thread::yield_if_should() {
-    if (should_yield()) {
+    if (thread_impl::get() && should_yield()) {
         yield();
     }
 }
