@@ -601,6 +601,7 @@ future<> write_text_representation(output_stream<char>& out, const config& ctx, 
 
             thread::yield_if_should();
             out.write(s.str()).get();
+            out.flush().get();
             thread::yield_if_should();
         });
     });
