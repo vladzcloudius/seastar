@@ -558,6 +558,7 @@ future<> write_text_representation(output_stream<char>& out, const config& ctx, 
             auto name = ctx.prefix + "_" + metric_family.name();
             found = false;
             metric_family.foreach_metric([&s, &ctx, &found, &name, &metric_family](auto value, auto value_info) mutable {
+                thread::yield_if_should();
                 if (!found) {
                     if (metric_family.metadata().d.str() != "") {
                         s << "# HELP " << name << " " <<  metric_family.metadata().d.str() << "\n";
