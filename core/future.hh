@@ -126,8 +126,8 @@ void report_failed_future(std::exception_ptr ex);
 template <typename... T>
 struct future_state {
     static constexpr bool copy_noexcept = std::is_nothrow_copy_constructible<std::tuple<T...>>::value;
-    static_assert(std::is_nothrow_move_constructible<std::tuple<T...>>::value,
-                  "Types must be no-throw move constructible");
+//    static_assert(std::is_nothrow_move_constructible<std::tuple<T...>>::value,
+//                  "Types must be no-throw move constructible");
     static_assert(std::is_nothrow_destructible<std::tuple<T...>>::value,
                   "Types must be no-throw destructible");
     static_assert(std::is_nothrow_copy_constructible<std::exception_ptr>::value,
@@ -232,11 +232,12 @@ struct future_state {
         assert(_state == state::result);
         return std::move(_u.value);
     }
-    template<typename U = std::tuple<T...>>
-    std::enable_if_t<std::is_copy_constructible<U>::value, U> get_value() const& noexcept(copy_noexcept) {
+
+    std::tuple<T...> get_value() const& noexcept(copy_noexcept) {
         assert(_state == state::result);
         return _u.value;
     }
+
     std::tuple<T...> get() && {
         assert(_state != state::future);
         if (_state == state::exception) {
