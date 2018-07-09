@@ -197,7 +197,7 @@ public:
     static void yield();
 
     /// \brief Defer execution of the current thread if thread::should_yiled() returns TRUE.
-    static void yield_if_should();
+    static void yield_maybe();
 
     /// \brief Checks whether this thread ought to call yield() now.
     ///
