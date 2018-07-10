@@ -232,8 +232,7 @@ struct future_state {
         assert(_state == state::result);
         return std::move(_u.value);
     }
-    template<typename U = std::tuple<T...>>
-    std::enable_if_t<std::is_copy_constructible<U>::value, U> get_value() const& noexcept(copy_noexcept) {
+    std::tuple<T...> get_value() const& noexcept(copy_noexcept) {
         assert(_state == state::result);
         return _u.value;
     }
