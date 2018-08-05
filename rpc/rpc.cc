@@ -933,7 +933,7 @@ future<> server::connection::send_unknown_verb_reply(compat::optional<rpc_clock_
   {}
 
   server::server(protocol_base* proto, server_options opts, ipv4_addr addr, resource_limits limits)
-      : server(proto, engine().listen(addr, listen_options(true)), limits, opts)
+      : server(proto, engine().listen(addr, listen_options{true, opts.load_balancing_algorithm}), limits, opts)
   {}
 
   server::server(protocol_base* proto, server_socket ss, resource_limits limits, server_options opts)
