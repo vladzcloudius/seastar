@@ -882,7 +882,7 @@ class DiskPerfTuner(PerfTunerBase):
         if os.path.exists(feature_file):
             return feature_file, dev_node
         elif udev.parent is not None:
-            return self.__get_feature_device(udev.parent.device_node, path_creator)
+            return self.__get_feature_file(udev.parent.device_node, path_creator)
         else:
             return None, None
 
