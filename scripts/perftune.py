@@ -749,7 +749,7 @@ class DiskPerfTuner(PerfTunerBase):
         """
         :return: Set of IO scheduler modes that we want to configure
         """
-        return frozenset("none", "noop")
+        return frozenset(["none", "noop"])
 
     @property
     def __nomerges(self):
