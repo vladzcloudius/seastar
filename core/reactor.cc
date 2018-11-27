@@ -1093,6 +1093,15 @@ reactor::handle_aio_error(::iocb* iocb, int ec) {
     }
 }
 
+static inline std::chrono::steady_clock::time_point get_time_point() {
+    using namespace std::chrono;
+    std::atomic_signal_fence(std::memory_order::memory_order_seq_cst);
+    steady_clock::time_point curr_time = steady_clock::now();
+    std::atomic_signal_fence(std::memory_order::memory_order_seq_cst);
+
+    return curr_time;
+}
+
 bool
 reactor::flush_pending_aio() {
     for (auto& ioq : my_io_queues) {
@@ -1103,10 +1112,20 @@ reactor::flush_pending_aio() {
     while (!_pending_aio.empty()) {
         auto nr = _pending_aio.size();
         auto iocbs = _pending_aio.data();
+        auto begin_t = get_time_point();
         auto r = io_submit(_io_context, nr, iocbs);
+        auto end_t = get_time_point();
+
+        if (end_t - begin_t >= std::chrono::milliseconds(500)) {
+            printf("io_submit() took more than 500ms!\n");
+        }
+
         size_t nr_consumed;
         if (r == -1) {
             nr_consumed = handle_aio_error(iocbs[0], errno);
+            if (nr_consumed == 0) {
+                printf("Going to spin!\n");
+            }
         } else {
             nr_consumed = size_t(r);
         }
