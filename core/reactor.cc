@@ -197,6 +197,7 @@ using namespace internal;
 
 seastar::logger seastar_logger("seastar");
 seastar::logger sched_logger("scheduler");
+seastar::logger io_submit_stalls_logger("io_submit_stalls");
 
 std::atomic<lowres_clock_impl::steady_rep> lowres_clock_impl::counters::_steady_now;
 std::atomic<lowres_clock_impl::system_rep> lowres_clock_impl::counters::_system_now;
@@ -1117,14 +1118,14 @@ reactor::flush_pending_aio() {
         auto end_t = get_time_point();
 
         if (end_t - begin_t >= std::chrono::milliseconds(500)) {
-            printf("io_submit() took more than 500ms!\n");
+            io_submit_stalls_logger.error("io_submit() took more than 500ms!\n");
         }
 
         size_t nr_consumed;
         if (r == -1) {
             nr_consumed = handle_aio_error(iocbs[0], errno);
             if (nr_consumed == 0) {
-                printf("Going to spin!\n");
+                io_submit_stalls_logger.error("Going to spin!\n");
             }
         } else {
             nr_consumed = size_t(r);
