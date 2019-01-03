@@ -6,6 +6,7 @@ import enum
 import functools
 import glob
 import itertools
+import multiprocessing
 import os
 import pathlib
 import pyudev
@@ -688,6 +689,7 @@ class DiskPerfTuner(PerfTunerBase):
 
         self.__pyudev_ctx = pyudev.Context()
         self.__dir2disks = self.__learn_directories()
+        self.__irqs2procline = get_irqs2procline_map()
         self.__disk2irqs = self.__learn_irqs()
         self.__type2diskinfo = self.__group_disks_info_by_type()
 
@@ -763,6 +765,30 @@ class DiskPerfTuner(PerfTunerBase):
         """
         return self.__type2diskinfo[DiskPerfTuner.SupportedDiskTypes(disks_type)]
 
+    def __nvme_fast_path_irq_filter(self, irq):
+        """
+        Return True for fast path NVMe IRQs.
+        For NVMe device only queues 1-<number of CPUs> are going to do fast path work.
+
+        NVMe IRQs have the following name convention:
+             nvme<device index>q<queue index>, e.g. nvme0q7
+
+        :param irq: IRQ number
+        :return: True if this IRQ is an IRQ of a FP NVMe queue.
+        """
+        nvme_irq_re = re.compile(r'(\s|^)nvme\d+q(\d+)(\s|$)')
+
+        # There may be more than an single HW queue bound to the same IRQ. In this case queue names are going to be
+        # coma separated
+        split_line = self.__irqs2procline[irq].split(",")
+
+        for line in split_line:
+            m = nvme_irq_re.search(line)
+            if m and 0 < int(m.group(2)) <= multiprocessing.cpu_count():
+                return True
+
+        return False
+
     def __group_disks_info_by_type(self):
         """
         Return a map of tuples ( [<disks>], [<irqs>] ), where "disks" are all disks of the specific type
@@ -792,7 +818,11 @@ class DiskPerfTuner(PerfTunerBase):
         if not (nvme_disks or non_nvme_disks):
             raise Exception("'disks' tuning was requested but no disks were found")
 
-        disks_info_by_type[DiskPerfTuner.SupportedDiskTypes.nvme] = ( list(nvme_disks), list(nvme_irqs) )
+        fast_path_nvme_irqs = list(filter(self.__nvme_fast_path_irq_filter, nvme_irqs))
+        # Sort IRQs for easier verification
+        fast_path_nvme_irqs.sort(key=lambda irq_num_str: int(irq_num_str))
+
+        disks_info_by_type[DiskPerfTuner.SupportedDiskTypes.nvme] = (list(nvme_disks), fast_path_nvme_irqs)
         disks_info_by_type[DiskPerfTuner.SupportedDiskTypes.non_nvme] = ( list(non_nvme_disks), list(non_nvme_irqs) )
 
         return disks_info_by_type
@@ -838,7 +868,6 @@ class DiskPerfTuner(PerfTunerBase):
 
     def __learn_irqs(self):
         disk2irqs = {}
-        irqs2procline = get_irqs2procline_map()
 
         for devices in list(self.__dir2disks.values()) + [ self.args.devs ]:
             for device in devices:
@@ -867,7 +896,7 @@ class DiskPerfTuner(PerfTunerBase):
                         break
 
                 controler_path_str = functools.reduce(lambda x, y : os.path.join(x, y), controller_path_parts)
-                disk2irqs[device] = learn_all_irqs_one(controler_path_str, irqs2procline, 'blkif')
+                disk2irqs[device] = learn_all_irqs_one(controler_path_str, self.__irqs2procline, 'blkif')
 
         return disk2irqs
 
