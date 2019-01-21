@@ -40,13 +40,15 @@ def run_hwloc_calc(prog_args):
     """
     return run_one_command(['hwloc-calc'] + prog_args).rstrip()
 
-def fwriteln(fname, line, log_error=True):
+def fwriteln(fname, line, log_message, log_error=True):
     try:
         with open(fname, 'w') as f:
             f.write(line)
+
+        print(log_message)
     except:
         if log_error:
-            print("Failed to write into {}: {}".format(fname, sys.exc_info()))
+            print("{}: failed to write into {}: {}".format(log_message, fname, sys.exc_info()))
 
 def readlines(fname):
     try:
@@ -57,8 +59,8 @@ def readlines(fname):
         return []
 
 def fwriteln_and_log(fname, line, log_error=True):
-    print("Writing '{}' to {}".format(line, fname))
-    fwriteln(fname, line, log_error)
+    msg = "Writing '{}' to {}".format(line, fname)
+    fwriteln(fname, line, log_message=msg, log_error=log_error)
 
 double_commas_pattern = re.compile(',,')
 
@@ -70,8 +72,8 @@ def set_one_mask(conf_file, mask, log_error=True):
     while double_commas_pattern.search(mask):
         mask = double_commas_pattern.sub(',0,', mask)
 
-    print("Setting mask {} in {}".format(mask, conf_file))
-    fwriteln(conf_file, mask, log_error)
+    msg = "Setting mask {} in {}".format(mask, conf_file)
+    fwriteln(conf_file, mask, log_message=msg, log_error=log_error)
 
 def distribute_irqs(irqs, cpu_mask, log_errors=True):
     # If IRQs' list is empty - do nothing
@@ -506,8 +508,8 @@ class NetPerfTuner(PerfTunerBase):
 
         # Set each RPS queue limit
         for rfs_limit_cnt in rps_limits:
-            print("Setting limit {} in {}".format(one_q_limit, rfs_limit_cnt))
-            fwriteln(rfs_limit_cnt, "{}".format(one_q_limit))
+            msg = "Setting limit {} in {}".format(one_q_limit, rfs_limit_cnt)
+            fwriteln(rfs_limit_cnt, "{}".format(one_q_limit), log_message=msg)
 
         # Enable ntuple filtering HW offload on the NIC
         print("Trying to enable ntuple filtering HW offload for {}...".format(iface), end='')
