@@ -753,7 +753,8 @@ class DiskPerfTuner(PerfTunerBase):
         nvme_disks, nvme_irqs = self.__disks_info_by_type(DiskPerfTuner.SupportedDiskTypes.nvme)
         if nvme_disks:
             print("Setting NVMe disks: {}...".format(", ".join(nvme_disks)))
-            distribute_irqs(nvme_irqs, self.args.cpu_mask, log_errors=self.args.verbose)
+            distribute_irqs(nvme_irqs, self.args.cpu_mask,
+                            log_errors=(self.is_aws_i3_non_metal_instance or self.args.verbose))
             self.__tune_disks(nvme_disks)
         else:
             print("No NVMe disks to tune")
