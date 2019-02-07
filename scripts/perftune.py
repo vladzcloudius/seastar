@@ -86,6 +86,30 @@ def distribute_irqs(irqs, cpu_mask, log_errors=True):
 def is_process_running(name):
     return len(list(filter(lambda ps_line : not re.search('<defunct>', ps_line), run_one_command(['ps', '--no-headers', '-C', name], check=False).splitlines()))) > 0
 
+def parse_config_file(config_file):
+    if not os.path.exists(config_file):
+        raise Exception("No such file: {}".format(config_file))
+
+    # Read the config file lines
+    cfile_lines = open(config_file, 'r').readlines()
+
+    # Filter out comment and empty lines
+    value_lines = filter(lambda line : not re.search(r'^\s*#', line) and re.search(r'\S', line), cfile_lines)
+
+    # Value lines must have the <key>=<value> format
+    conf = {}
+    key_value_pattern = re.compile(r'^(\S+)=(.+)$')
+    for value_line in value_lines:
+        # key, value = value_line.split("=");
+        m = key_value_pattern.match(value_line)
+        if not m:
+            raise Exception("{}: malformed line: {}".format(config_file, value_line))
+
+        # Strip the quotes from the value if present
+        conf[m.group(1)] = re.sub(r'^"|"$', '', m.group(2))
+
+    return conf
+
 def restart_irqbalance(banned_irqs):
     """
     Restart irqbalance if it's running and ban it from moving the IRQs from the
@@ -118,6 +142,22 @@ def restart_irqbalance(banned_irqs):
         else:
             print("Unknown system configuration - not restarting irqbalance!")
             print("You have to prevent it from moving IRQs {} manually!".format(banned_irqs_list))
+            return
+    else:
+        try:
+            # For newer Ubuntus (starting from 18 up) options key is IRQBALANCE_ARGS like on Red Hat distros
+            os_release_config = parse_config_file('/etc/os-release')
+            if 'ID' in os_release_config and os_release_config['ID'] == 'ubuntu':
+                # Get major version number VERSION_ID for Ubuntu is always something like X.Y - we need X
+                if 'VERSION_ID' in os_release_config and int(os_release_config['VERSION_ID'].split(".")[0]) >= 18:
+                    options_key = 'IRQBALANCE_ARGS'
+        except Exception as ex:
+            print("Failed to parse /etc/os-release: {}".format(ex))
+            print("Not restarting irqbalance. You have to prevent it from moving IRQs {} manually!".format(banned_irqs_list))
+            return
+        except:
+            print("Failed to parse /etc/os-release: {}".format(sys.exc_info()[0]))
+            print("Not restarting irqbalance. You have to prevent it from moving IRQs {} manually!".format(banned_irqs_list))
             return
 
     orig_file = "{}.scylla.orig".format(config_file)
