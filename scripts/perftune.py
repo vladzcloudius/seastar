@@ -236,6 +236,7 @@ class PerfTunerBase(metaclass=abc.ABCMeta):
         sq_split = 0
         sq = 1
         mq = 2
+        sq_split_2numa = 3
 
         @staticmethod
         def names():
@@ -266,6 +267,9 @@ class PerfTunerBase(metaclass=abc.ABCMeta):
         elif mq_mode == PerfTunerBase.SupportedModes.sq_split:
             # all but CPU0 and its HT siblings
             irqs_cpu_mask = run_hwloc_calc([cpu_mask, '~core:0'])
+        elif mq_mode == PerfTunerBase.SupportedModes.sq_split_2numa:
+            # all but CPU0 and its HT siblings
+            irqs_cpu_mask = run_hwloc_calc([cpu_mask, '~package:0.core:0', '~package:1.core:0'])
         elif mq_mode == PerfTunerBase.SupportedModes.mq:
             # all available cores
             irqs_cpu_mask = cpu_mask
