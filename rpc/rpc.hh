@@ -37,6 +37,7 @@
 #include "core/queue.hh"
 #include "core/weak_ptr.hh"
 #include "../core/scheduling.hh"
+#include "core/print.hh"
 
 namespace seastar {
 
@@ -414,7 +415,9 @@ public:
     }
     template<typename Serializer, typename... Out>
     future<sink<Out...>> make_stream_sink(socket socket) {
+        get_logger()(peer_address(), "opening stream connection: start");
         return await_connection().then([this, socket = std::move(socket)] () mutable {
+            get_logger()(peer_address(), "opening stream connection: rpc is connected");
             if (!this->get_connection_id()) {
                 return make_exception_future<sink<Out...>>(std::runtime_error("Streaming is not supported by the server"));
             }
@@ -425,6 +428,7 @@ public:
             c->_parent = this->weak_from_this();
             c->_is_stream = true;
             return c->await_connection().then([c, this] {
+                get_logger()(peer_address(), format("opening stream connection: stream {} is connected", c->get_connection_id()));
                 xshard_connection_ptr s = make_lw_shared(make_foreign(static_pointer_cast<rpc::connection>(c)));
                 this->register_stream(c->get_connection_id(), s);
                 return sink<Out...>(make_shared<sink_impl<Serializer, Out...>>(std::move(s)));

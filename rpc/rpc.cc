@@ -425,7 +425,17 @@ namespace rpc {
       // we do not want to dead lock on huge packets, so let them in
       // but only one at a time
       auto size = std::min(size_t(buf.size), max_stream_buffers_memory);
-      return get_units(_stream_sem, size).then([this, buf = std::move(buf)] (semaphore_units<>&& su) mutable {
+      auto f = get_units(_stream_sem, size);
+      thread_local uint64_t gid = 0;
+      int64_t id = 0;
+      if (!f.available()) {
+        id = ++gid;
+        get_logger()(peer_address(), format("rpc::source {}:{} cannot recv {} bytes need {} units only {} available", get_connection_id(), id, buf.size, size, _stream_sem.available_units()));
+      }
+      return f.then([this, buf = std::move(buf), id] (semaphore_units<>&& su) mutable {
+          if (id) {
+              get_logger()(peer_address(), format("rpc::source {}:{} semaphore units acquired", get_connection_id(), id));
+          }
           buf.su = std::move(su);
           return _stream_queue.push_eventually(std::move(buf));
       });

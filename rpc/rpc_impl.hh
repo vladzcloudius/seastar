@@ -665,9 +665,19 @@ future<> sink_impl<Serializer, Out...>::operator()(const Out&... args) {
     // we do not want to dead lock on huge packets, so let them in
     // but only one at a time
     auto size = std::min(size_t(data.size), max_stream_buffers_memory);
-    return get_units(this->_sem, size).then([this, data = make_foreign(std::make_unique<snd_buf>(std::move(data)))] (semaphore_units<> su) mutable {
+    auto f = get_units(this->_sem, size);
+    thread_local uint64_t gid = 0;
+    int64_t id = 0;
+    if (!f.available()) {
+        id = ++gid;
+        this->_con->get()->get_logger()(this->_con->get()->peer_address(), format("rpc::sink {}:{} cannot send {} bytes need {} units only {} available", this->_con->get()->get_connection_id(), id, data.size, size, this->_sem.available_units()));
+    }
+    return f.then([this, data = make_foreign(std::make_unique<snd_buf>(std::move(data))), id] (semaphore_units<> su) mutable {
         if (this->_ex) {
             return make_exception_future(this->_ex);
+        }
+        if (id) {
+            this->_con->get()->get_logger()(this->_con->get()->peer_address(), format("rpc::sink {}:{} semaphore units acquired", this->_con->get()->get_connection_id(), id));
         }
         smp::submit_to(this->_con->get_owner_shard(), [this, data = std::move(data)] () mutable {
             connection* con = this->_con->get();
@@ -678,7 +688,10 @@ future<> sink_impl<Serializer, Out...>::operator()(const Out&... args) {
                 return make_exception_future(stream_closed());
             }
             return con->send(make_shard_local_buffer_copy(std::move(data)), {}, nullptr);
-        }).then_wrapped([su = std::move(su), this] (future<> f) {
+        }).then_wrapped([su = std::move(su), this, id] (future<> f) {
+            if (id) {
+                this->_con->get()->get_logger()(this->_con->get()->peer_address(), format("rpc::sink {}:{} complete sending packet that waited for units", this->_con->get()->get_connection_id(), id));
+            }
             if (f.failed() && !this->_ex) { // first error is the interesting one
                 this->_ex = f.get_exception();
             } else {
@@ -730,7 +743,17 @@ future<compat::optional<std::tuple<In...>>> source_impl<Serializer, In...>::oper
     // refill buffers from remote cpu
     return smp::submit_to(this->_con->get_owner_shard(), [this] () -> future<> {
         connection* con = this->_con->get();
-        return con->stream_receive(this->_bufs).then_wrapped([this, con] (future<>&& f) {
+        auto f = con->stream_receive(this->_bufs);
+        thread_local uint64_t gid = 0;
+        uint64_t id = 0;
+        if (!f.available()) {
+            id = ++gid;
+            con->get_logger()(con->peer_address(), format("rpc::source {}:{} waiting on stream_receive", con->get_connection_id(), id));
+        }
+        return f.then_wrapped([this, con, id] (future<>&& f) {
+            if (id) {
+               con->get_logger()(con->peer_address(), format("rpc::source {}:{} stream_receive completed", con->get_connection_id(), id));
+            }
             if (f.failed()) {
                 return con->close_source().then_wrapped([ex = f.get_exception()] (future<> f){
                     f.ignore_ready_future();
