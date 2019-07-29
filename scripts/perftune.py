@@ -1208,6 +1208,7 @@ argp.add_argument('--mode', choices=PerfTunerBase.SupportedModes.names(), help='
 argp.add_argument('--nic', help='network interface name, by default uses \'eth0\'')
 argp.add_argument('--tune-clock', action='store_true', help='Force tuning of the system clocksource')
 argp.add_argument('--get-cpu-mask', action='store_true', help="print the CPU mask to be used for compute")
+argp.add_argument('--get-cpu-mask-quiet', action='store_true', help="print the CPU mask to be used for compute, print the whole CPU set if a given tuning mode is impossible")
 argp.add_argument('--verbose', action='store_true', help="be more verbose about operations and their result")
 argp.add_argument('--tune', choices=TuneModes.names(), help="components to configure (may be given more than once)", action='append', default=[])
 argp.add_argument('--cpu-mask', help="mask of cores to use, by default use all available cores", metavar='MASK')
@@ -1340,7 +1341,7 @@ try:
         for tuner in tuners:
             tuner.mode = mode
 
-    if args.get_cpu_mask:
+    if args.get_cpu_mask or args.get_cpu_mask_quiet:
         # Print the compute mask from the first tuner - it's going to be the same in all of them
         perftune_print(tuners[0].compute_cpu_mask)
     else:
@@ -1349,6 +1350,14 @@ try:
 
         for tuner in tuners:
             tuner.tune()
+except PerfTunerBase.CPUMaskIsZeroException as e:
+    # Print the whole CPU set if --get-cpu-mask-quiet was requested and a given tuning mode is impossible on the current
+    # system.
+    # Print the value given with a --cpu-mask parameter if given or the full CPU set of the system otherwise.
+    if args.get_cpu_mask_quiet:
+        perftune_print(args.cpu_mask)
+    else:
+        sys.exit("ERROR: {}. Your system can't be tuned until the issue is fixed.".format(e))
 except Exception as e:
     sys.exit("ERROR: {}. Your system can't be tuned until the issue is fixed.".format(e))
 
