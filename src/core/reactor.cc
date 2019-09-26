@@ -5121,6 +5121,9 @@ smp::get_options_description()
 #ifndef SEASTAR_NO_EXCEPTION_HACK
         ("enable-glibc-exception-scaling-workaround", bpo::value<bool>()->default_value(true), "enable workaround for glibc/gcc c++ exception scalablity problem")
 #endif
+#ifdef SEASTAR_HAVE_DPDK
+        ("argv0", bpo::value<std::string>(), "Additional DPDK parameters")
+#endif
         ;
     return opts;
 }
