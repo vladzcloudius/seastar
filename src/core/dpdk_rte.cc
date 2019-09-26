@@ -24,6 +24,8 @@
 #include <seastar/util/std-compat.hh>
 #include <rte_pci.h>
 
+#include <boost/algorithm/string.hpp>
+
 namespace seastar {
 
 namespace dpdk {
@@ -46,12 +48,21 @@ void eal::init(cpuset cpus, boost::program_options::variables_map opts)
     std::string mask_str = mask.str();
     std::reverse(mask_str.begin(), mask_str.end());
 
-    // TODO: Inherit these from the app parameters - "opts"
     std::vector<std::vector<char>> args {
-        string2vector(opts["argv0"].as<std::string>()),
         string2vector("-c"), string2vector(mask_str),
         string2vector("-n"), string2vector("1")
     };
+
+    std::string argv0 = opts["argv0"].as<std::string>();
+    std::vector<std::string> argv0_params;
+
+    if (!argv0.empty()) {
+        boost::split(argv0_params, argv0, boost::is_any_of(" "));
+    }
+
+    for (const std::string& p : argv0_params) {
+        args.push_back(string2vector(p));
+    }
 
     compat::optional<std::string> hugepages_path;
     if (opts.count("hugepages")) {
