@@ -27,6 +27,7 @@ find_path (dpdk_INCLUDE_DIR
 find_library (dpdk_PMD_VMXNET3_UIO_LIBRARY rte_pmd_vmxnet3_uio)
 find_library (dpdk_PMD_I40E_LIBRARY rte_pmd_i40e)
 find_library (dpdk_PMD_IXGBE_LIBRARY rte_pmd_ixgbe)
+find_library (dpdk_PMD_VIRTIO_LIBRARY rte_pmd_virtio)
 find_library (dpdk_PMD_E1000_LIBRARY rte_pmd_e1000)
 find_library (dpdk_PMD_BNXT_LIBRARY rte_pmd_bnxt)
 find_library (dpdk_PMD_RING_LIBRARY rte_pmd_ring)
@@ -61,6 +62,7 @@ set (dpdk_REQUIRED
   dpdk_PMD_I40E_LIBRARY
   dpdk_PMD_IXGBE_LIBRARY
   dpdk_PMD_E1000_LIBRARY
+  dpdk_PMD_VIRTIO_LIBRARY
   dpdk_PMD_BNXT_LIBRARY
   dpdk_PMD_RING_LIBRARY
   dpdk_PMD_CXGBE_LIBRARY
@@ -115,6 +117,7 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
     ${dpdk_PMD_QEDE_LIBRARY}
     ${dpdk_PMD_I40E_LIBRARY}
     ${dpdk_PMD_IXGBE_LIBRARY}
+    ${dpdk_PMD_IXGBE_VIRTIO}
     ${dpdk_PMD_NFP_LIBRARY}
     ${dpdk_PMD_RING_LIBRARY}
     ${dpdk_PMD_VMXNET3_UIO_LIBRARY})
@@ -134,6 +137,17 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
     ${dpdk_PCI_LIBRARY}
     ${dpdk_BUS_PCI_LIBRARY}
     ${dpdk_BUS_VDEV_LIBRARY})
+
+  #
+  # pmd_virtio
+  #
+
+  add_library (dpdk::pmd_virtio UNKNOWN IMPORTED)
+
+  set_target_properties (dpdk::pmd_virtio
+    PROPERTIES
+      IMPORTED_LOCATION ${dpdk_PMD_VIRTIO_LIBRARY}
+      INTERFACE_INCLUDE_DIRECTORIES ${dpdk_INCLUDE_DIR})
 
   #
   # pmd_vmxnet3_uio
@@ -470,6 +484,7 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
     dpdk::pmd_qede
     dpdk::pmd_i40e
     dpdk::pmd_ixgbe
+    dpdk::pmd_virtio
     dpdk::pmd_nfp
     dpdk::pmd_ring
     dpdk::pmd_vmxnet3_uio
