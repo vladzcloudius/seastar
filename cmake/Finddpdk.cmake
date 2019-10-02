@@ -41,6 +41,7 @@ find_library (dpdk_KVARGS_LIBRARY rte_kvargs)
 find_library (dpdk_MEMPOOL_LIBRARY rte_mempool)
 find_library (dpdk_MEMPOOL_RING_LIBRARY rte_mempool_ring)
 find_library (dpdk_PMD_SFC_EFX_LIBRARY rte_pmd_sfc_efx)
+find_library (dpdk_PMD_VIRTIO_LIBRARY rte_pmd_virtio)
 find_library (dpdk_HASH_LIBRARY rte_hash)
 find_library (dpdk_CMDLINE_LIBRARY rte_cmdline)
 find_library (dpdk_MBUF_LIBRARY rte_mbuf)
@@ -68,6 +69,7 @@ set (dpdk_REQUIRED
   dpdk_PMD_ENIC_LIBRARY
   dpdk_PMD_NFP_LIBRARY
   dpdk_PMD_QEDE_LIBRARY
+  dpdk_PMD_VIRTIO_LIBRARY
   dpdk_RING_LIBRARY
   dpdk_KVARGS_LIBRARY
   dpdk_MEMPOOL_LIBRARY
@@ -117,7 +119,8 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
     ${dpdk_PMD_IXGBE_LIBRARY}
     ${dpdk_PMD_NFP_LIBRARY}
     ${dpdk_PMD_RING_LIBRARY}
-    ${dpdk_PMD_VMXNET3_UIO_LIBRARY})
+    ${dpdk_PMD_VMXNET3_UIO_LIBRARY}
+    ${dpdk_PMD_VIRTIO_LIBRARY})
 
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set (dpdk_LIBRARIES
@@ -281,6 +284,17 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
   set_target_properties (dpdk::pmd_sfc_efx
     PROPERTIES
       IMPORTED_LOCATION ${dpdk_PMD_SFC_EFX_LIBRARY}
+      INTERFACE_INCLUDE_DIRECTORIES ${dpdk_INCLUDE_DIR})
+
+  #
+  # pmd_virtio
+  #
+
+  add_library (dpdk::pmd_virtio UNKNOWN IMPORTED)
+
+  set_target_properties (dpdk::pmd_virtio
+    PROPERTIES
+    IMPORTED_LOCATION ${dpdk_PMD_VIRTIO_LIBRARY}
       INTERFACE_INCLUDE_DIRECTORIES ${dpdk_INCLUDE_DIR})
 
   #
@@ -476,6 +490,7 @@ if (dpdk_FOUND AND NOT (TARGET dpdk::dpdk))
     dpdk::pmd_i40e
     dpdk::pmd_ixgbe
     dpdk::pmd_nfp
+    dpdk::pmd_virtio
     dpdk::pmd_ring
     dpdk::pmd_vmxnet3_uio
     dpdk::ring
