@@ -261,7 +261,7 @@ else()
 endif()
 
 set (dpdk_args
-  EXTRA_CFLAGS=-Wno-error
+  EXTRA_CFLAGS=-g
   O=<BINARY_DIR>
   DESTDIR=<INSTALL_DIR>
   T=${dpdk_quadruple})
