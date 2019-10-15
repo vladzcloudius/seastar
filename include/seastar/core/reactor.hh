@@ -58,6 +58,7 @@
 #include <seastar/util/eclipse.hh>
 #include <seastar/core/future.hh>
 #include <seastar/core/posix.hh>
+#include <seastar/core/shared_ptr.hh>
 #include <seastar/core/apply.hh>
 #include <seastar/core/sstring.hh>
 #include <seastar/net/api.hh>
@@ -913,6 +914,14 @@ reactor::make_pollfn(Func&& func) {
 
 extern __thread reactor* local_engine;
 extern __thread size_t task_quota;
+
+struct huge_page_info {
+    lw_shared_ptr<file_desc> fdp;
+    char *start = nullptr;
+    char *end = nullptr;
+};
+
+extern std::vector<huge_page_info> huge_page_infos;
 
 inline reactor& engine() {
     return *local_engine;

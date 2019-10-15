@@ -53,6 +53,7 @@
 // allocator)
 
 #include <seastar/core/cacheline.hh>
+#include <seastar/core/dpdk_rte.hh>
 #include <seastar/core/memory.hh>
 #include <seastar/core/reactor.hh>
 #include <seastar/core/print.hh>
@@ -915,13 +916,13 @@ mmap_area
 allocate_hugetlbfs_memory(file_desc& fd, compat::optional<void*> where, size_t how_much) {
     auto pos = fd.size();
     fd.truncate(pos + how_much);
-    auto ret = fd.map(
+    auto addr = fd.map(
             how_much,
             PROT_READ | PROT_WRITE,
             MAP_SHARED | MAP_POPULATE | (where ? MAP_FIXED : 0),
             pos,
             where.value_or(nullptr));
-    return ret;
+    return addr;
 }
 
 void cpu_pages::replace_memory_backing(allocate_system_memory_fn alloc_sys_mem) {
@@ -1320,7 +1321,7 @@ void disable_large_allocation_warning() {
     cpu_mem.large_allocation_warning_threshold = std::numeric_limits<size_t>::max();
 }
 
-void configure(std::vector<resource::memory> m, bool mbind,
+void configure(std::vector<resource::memory> m, bool mbind, int shard_id,
         optional<std::string> hugetlbfs_path) {
     size_t total = 0;
     for (auto&& x : m) {
@@ -1331,6 +1332,7 @@ void configure(std::vector<resource::memory> m, bool mbind,
         // std::function is copyable, but file_desc is not, so we must use
         // a shared_ptr to allow sys_alloc to be copied around
         auto fdp = make_lw_shared<file_desc>(file_desc::temporary(*hugetlbfs_path));
+        huge_page_infos[shard_id].fdp = fdp;
         sys_alloc = [fdp] (optional<void*> where, size_t how_much) {
             return allocate_hugetlbfs_memory(*fdp, where, how_much);
         };
@@ -1357,6 +1359,16 @@ void configure(std::vector<resource::memory> m, bool mbind,
 #endif
         pos += x.bytes;
     }
+
+    huge_page_infos[shard_id].start = (char *)cpu_mem.memory_layout().start;
+    huge_page_infos[shard_id].end = (char *)cpu_mem.memory_layout().end;
+
+    if (dpdk::eal::initialized)
+       rte_extmem_register(huge_page_infos[shard_id].start,
+                            huge_page_infos[shard_id].end - huge_page_infos[shard_id].start,
+                            NULL,
+                            (huge_page_infos[shard_id].end - huge_page_infos[shard_id].start) / memory::huge_page_size,
+                            memory::huge_page_size, huge_page_infos[shard_id].fdp->get());
 }
 
 statistics stats() {

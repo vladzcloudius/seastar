@@ -73,7 +73,7 @@ static constexpr size_t huge_page_size =
 #error "Huge page size is not defined for this architecture"
 #endif
 
-void configure(std::vector<resource::memory> m, bool mbind,
+void configure(std::vector<resource::memory> m, bool mbind, int shard_id,
         compat::optional<std::string> hugetlbfs_path = {});
 
 void enable_abort_on_allocation_failure();

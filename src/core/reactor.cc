@@ -5425,6 +5425,8 @@ void smp::register_network_stacks() {
     register_native_stack();
 }
 
+std::vector<huge_page_info> huge_page_infos;
+
 void smp::configure(boost::program_options::variables_map configuration, reactor_config reactor_cfg)
 {
 #ifndef SEASTAR_NO_EXCEPTION_HACK
@@ -5508,6 +5510,7 @@ void smp::configure(boost::program_options::variables_map configuration, reactor
     }
     smp::count = nr_cpus;
     _reactors.resize(nr_cpus);
+    huge_page_infos.resize(smp::count);
     resource::configuration rc;
     if (configuration.count("memory")) {
         rc.total_memory = parse_memory_size(configuration["memory"].as<std::string>());
@@ -5565,7 +5568,7 @@ void smp::configure(boost::program_options::variables_map configuration, reactor
     if (thread_affinity) {
         smp::pin(allocations[0].cpu_id);
     }
-    memory::configure(allocations[0].mem, mbind, hugepages_path);
+    memory::configure(allocations[0].mem, mbind, 0, hugepages_path);
 
     if (configuration.count("abort-on-seastar-bad-alloc")) {
         memory::enable_abort_on_allocation_failure();
@@ -5638,7 +5641,7 @@ void smp::configure(boost::program_options::variables_map configuration, reactor
             if (thread_affinity) {
                 smp::pin(allocation.cpu_id);
             }
-            memory::configure(allocation.mem, mbind, hugepages_path);
+            memory::configure(allocation.mem, mbind, i, hugepages_path);
             memory::set_heap_profiling_enabled(heapprof_enabled);
             sigset_t mask;
             sigfillset(&mask);

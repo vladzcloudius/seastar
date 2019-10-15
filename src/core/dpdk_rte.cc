@@ -108,6 +108,13 @@ void eal::init(cpuset cpus, boost::program_options::variables_map opts)
         rte_exit(EXIT_FAILURE, "Cannot init EAL\n");
     }
 
+    for (unsigned int i = 0; i < smp::count && huge_page_infos[i].fdp; i++)
+        rte_extmem_register(huge_page_infos[i].start,
+                            huge_page_infos[i].end - huge_page_infos[i].start,
+                            NULL,
+                            (huge_page_infos[i].end - huge_page_infos[i].start) / memory::huge_page_size,
+                            memory::huge_page_size, huge_page_infos[i].fdp->get());
+
     initialized = true;
 }
 

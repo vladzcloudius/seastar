@@ -1564,7 +1564,6 @@ int dpdk_device::init_port_start()
     // all together. If this assumption breaks we need to rework the below logic
     // by splitting the csum offload feature bit into separate bits for IPv4,
     // TCP and UDP.
-    printf("RX offload capa: %x\n", _dev_info.rx_offload_capa);
     /*assert(((_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) &&
             (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) &&
             (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM)) ||
@@ -1881,6 +1880,7 @@ bool dpdk_qp<HugetlbfsMemBackend>::map_dma()
 
     return 1;
     //return rte_vfio_dma_map(m.start, iova, m.end - m.start) == 0;
+    //ToDo: replace with rte_dev_dma_map()
 }
 
 void dpdk_device::check_port_link_status()
