@@ -1887,12 +1887,10 @@ void dpdk_device::check_port_link_status()
 {
     using namespace std::literals::chrono_literals;
     int count = 0;
-    constexpr auto check_interval = 100ms;
+    const int max_check_time = 90;  /* 9s (90 * 100ms) in total */
 
     std::cout << "\nChecking link status " << std::endl;
-    auto t = new timer<>;
-    t->set_callback([this, count, t] () mutable {
-        const int max_check_time = 90;  /* 9s (90 * 100ms) in total */
+    do {
         struct rte_eth_link link;
         memset(&link, 0, sizeof(link));
         rte_eth_link_get_nowait(_port_idx, &link);
@@ -1908,16 +1906,14 @@ void dpdk_device::check_port_link_status()
 
             // We may start collecting statistics only after the Link is UP.
             _stats_collector.arm_periodic(2s);
+            break;
         } else if (count++ < max_check_time) {
              std::cout << "." << std::flush;
-             return;
+             boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         } else {
             std::cout << "done\nPort " << _port_idx << " Link Down" << std::endl;
         }
-        t->cancel();
-        delete t;
-    });
-    t->arm_periodic(check_interval);
+    } while (count < max_check_time);
 }
 
 // This function uses offsetof with non POD types.
