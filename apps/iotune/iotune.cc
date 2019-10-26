@@ -320,7 +320,7 @@ public:
 
     future<> issue_request(char* buf) {
         return _req_impl->issue_request(_pos_impl->get_pos(), buf, _buffer_size).then([this] (size_t size) {
-            auto now = iotune_clock::now();
+            std::chrono::time_point<iotune_clock, std::chrono::duration<double>> now = iotune_clock::now();
             iotune_logger.info("{}: request is done. measuring range [{}, {}]", now.time_since_epoch().count(), _start_measuring.time_since_epoch().count(), _end_measuring.time_since_epoch().count());
             if ((now > _start_measuring) && (now < _end_measuring)) {
                 _last_time_seen = now;
