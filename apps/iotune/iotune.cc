@@ -269,6 +269,7 @@ class write_request_issuer : public request_issuer {
 public:
     explicit write_request_issuer(file f) : _file(f) {}
     future<size_t> issue_request(uint64_t pos, char* buf, uint64_t size) override {
+        iotune_logger.info("Issuing write");
         return _file.dma_write(pos, buf, size);
     }
 };
@@ -320,6 +321,7 @@ public:
     future<> issue_request(char* buf) {
         return _req_impl->issue_request(_pos_impl->get_pos(), buf, _buffer_size).then([this] (size_t size) {
             auto now = iotune_clock::now();
+            iotune_logger.info("{}: request is done. measuring range [{}, {}]", now.time_since_epoch().count(), _start_measuring.time_since_epoch().count(), _end_measuring.time_since_epoch().count());
             if ((now > _start_measuring) && (now < _end_measuring)) {
                 _last_time_seen = now;
                 _bytes += size;
