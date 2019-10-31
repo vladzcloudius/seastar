@@ -56,6 +56,7 @@
 #include <rte_cycles.h>
 #include <rte_memzone.h>
 #include <rte_vfio.h>
+#include <rte_dev.h>
 
 #if RTE_VERSION <= RTE_VERSION_NUM(2,0,0,16)
 
@@ -1868,19 +1869,24 @@ bool dpdk_qp<HugetlbfsMemBackend>::init_rx_mbuf_pool()
     return _pktmbuf_pool_rx != nullptr;
 }
 
-// Map DMA address explicitly.
-// XXX: does NOT work with Mellanox NICs as they use IB libs instead of VFIO.
 template <bool HugetlbfsMemBackend>
 bool dpdk_qp<HugetlbfsMemBackend>::map_dma()
 {
     auto m = memory::get_memory_layout();
     rte_iova_t iova = rte_mem_virt2iova((const void*)m.start);
 
-    printf("%s : iova = %lx\n", __func__, iova);
+    unsigned int portid;
 
-    return 1;
-    //return rte_vfio_dma_map(m.start, iova, m.end - m.start) == 0;
-    //ToDo: replace with rte_dev_dma_map()
+    RTE_ETH_FOREACH_DEV(portid) {
+        struct rte_eth_dev *eth_dev = &rte_eth_devices[portid];
+        int ret;
+
+        ret = rte_dev_dma_map(eth_dev->device, (void *)m.start, iova, m.end - m.start);
+        if (ret)
+            return 0;
+    }
+
+     return 1;
 }
 
 void dpdk_device::check_port_link_status()
