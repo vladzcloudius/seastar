@@ -1960,14 +1960,14 @@ dpdk_qp<HugetlbfsMemBackend>::dpdk_qp(dpdk_device* dev, uint16_t qid,
     // Register error statistics: Rx total and checksum errors
     namespace sm = seastar::metrics;
     _metrics.add_group(_stats_plugin_name, {
-        sm::make_derive(_queue_name + "_rx_csum_errors", _stats.rx.bad.csum,
+        sm::make_derive("rx_csum_errors", _stats.rx.bad.csum,
                         sm::description("Counts a number of packets received by this queue that have a bad CSUM value. "
                                         "A non-zero value of this metric usually indicates a HW issue, e.g. a bad cable.")),
 
-        sm::make_derive(_queue_name + "_rx_errors", _stats.rx.bad.total,
+        sm::make_derive("rx_errors", _stats.rx.bad.total,
                         sm::description("Counts a total number of errors in the ingress path for this queue: CSUM errors, etc.")),
 
-        sm::make_derive(_queue_name + "_rx_no_memory_errors", _stats.rx.bad.no_mem,
+        sm::make_derive("rx_no_memory_errors", _stats.rx.bad.no_mem,
                         sm::description("Counts a number of ingress packets received by this HW queue but dropped by the SW due to low memory. "
                                         "A non-zero value indicates that seastar doesn't have enough memory to handle the packet reception or the memory is too fragmented.")),
     });
