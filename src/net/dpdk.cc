@@ -1768,6 +1768,13 @@ void* dpdk_qp<HugetlbfsMemBackend>::alloc_mempool_xmem(
         return nullptr;
     }
 
+    rte_iova_t iova = rte_mem_virt2iova((const void*)xmem);
+
+    if (rte_vfio_dma_map(xmem, iova, xmem_size)) {
+        free(xmem);
+        return nullptr;
+    }
+
     return xmem;
 }
 
@@ -1873,6 +1880,8 @@ bool dpdk_qp<HugetlbfsMemBackend>::init_rx_mbuf_pool()
 template <bool HugetlbfsMemBackend>
 bool dpdk_qp<HugetlbfsMemBackend>::map_dma()
 {
+    return true;
+
     auto m = memory::get_memory_layout();
     rte_iova_t iova = rte_mem_virt2iova((const void*)m.start);
 
