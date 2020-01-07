@@ -1262,6 +1262,7 @@ public:
 
     dpdk_device& port() const { return *_dev; }
     tx_buf* get_tx_buf() { return _tx_buf_factory.get(); }
+    static void free_ext_buf(void* addr, void*) { std::free(addr); }
 private:
 
     template <class Func>
@@ -1316,22 +1317,20 @@ private:
      */
     static bool refill_rx_mbuf(rte_mbuf* m, size_t size = mbuf_data_size) {
         char* data;
+        uint16_t mbuf_buf_len = size + sizeof(rte_mbuf_ext_shared_info);
 
-        if (posix_memalign((void**)&data, size, size)) {
+        if (posix_memalign((void**)&data, size, mbuf_buf_len)) {
             return false;
         }
 
         rte_iova_t iova = rte_mem_virt2iova(data);
 
-        //
-        // Set the mbuf to point to our data.
-        //
-        // Do some DPDK hacks to work on PMD: it assumes that the buf_addr
-        // points to the private data of RTE_PKTMBUF_HEADROOM before the
-        // actual data buffer.
-        //
-        m->buf_addr      = data - RTE_PKTMBUF_HEADROOM;
-        m->buf_iova      = iova - RTE_PKTMBUF_HEADROOM;
+        rte_mbuf_ext_shared_info* shinfo = rte_pktmbuf_ext_shinfo_init_helper(data, &mbuf_buf_len, free_ext_buf, nullptr);
+        if (!shinfo) {
+            return false;
+        }
+
+        rte_pktmbuf_attach_extbuf(m, data, iova, mbuf_buf_len, shinfo);
         return true;
     }
 
@@ -1340,9 +1339,6 @@ private:
         if (!refill_rx_mbuf(m, size)) {
             return false;
         }
-        // The below fields stay constant during the execution.
-        m->buf_len       = size + RTE_PKTMBUF_HEADROOM;
-        m->data_off      = RTE_PKTMBUF_HEADROOM;
         return true;
     }
 
@@ -2051,11 +2047,19 @@ dpdk_qp<true>::from_mbuf_lro(rte_mbuf* m)
     _frags.clear();
     _bufs.clear();
 
+    _frags.reserve(m->nb_segs);
+    _bufs.reserve(m->nb_segs);
+
     for (; m != nullptr; m = m->next) {
         char* data = rte_pktmbuf_mtod(m, char*);
 
         _frags.emplace_back(fragment{data, rte_pktmbuf_data_len(m)});
         _bufs.push_back(data);
+
+        // Bump the refcount to two so that rte_pktmbuf_detach_extbuf() won't call the
+        // free_cb on the buffer. We will free the buffer ourselves.
+        rte_mbuf_ext_refcnt_set(m->shinfo, 2);
+        rte_pktmbuf_detach_extbuf(m);
     }
 
     return packet(_frags.begin(), _frags.end(),
@@ -2067,6 +2071,7 @@ dpdk_qp<true>::from_mbuf_lro(rte_mbuf* m)
                           }));
 }
 
+// FIXME: handle the OOM case - there are quite a few places below where we allocate and may throw
 template<>
 inline compat::optional<packet> dpdk_qp<true>::from_mbuf(rte_mbuf* m)
 {
@@ -2076,8 +2081,12 @@ inline compat::optional<packet> dpdk_qp<true>::from_mbuf(rte_mbuf* m)
     if (!_dev->hw_features_ref().rx_lro || rte_pktmbuf_is_contiguous(m)) {
         char* data = rte_pktmbuf_mtod(m, char*);
 
-        return packet(fragment{data, rte_pktmbuf_data_len(m)},
-                      make_free_deleter(data));
+        // Bump the refcount to two so that rte_pktmbuf_detach_extbuf() won't call the
+        // free_cb on the buffer. We will free the buffer ourselves.
+        rte_mbuf_ext_refcnt_set(m->shinfo, 2);
+        rte_pktmbuf_detach_extbuf(m);
+
+        return packet(fragment{data, rte_pktmbuf_data_len(m)}, make_free_deleter(data));
     } else {
         return from_mbuf_lro(m);
     }
