@@ -71,8 +71,12 @@ struct hw_features {
     bool tx_csum_ip_offload = false;
     // Enable tx l4 (TCP or UDP) checksum offload
     bool tx_csum_l4_offload = false;
-    // Enable rx checksum offload
-    bool rx_csum_offload = false;
+    // Enable rx IPv4 checksum offload
+    bool rx_csum_ipv4_offload = false;
+    // Enable rx UDP checksum offload
+    bool rx_csum_udp_offload = false;
+    // Enable rx UDP checksum offload
+    bool rx_csum_tcp_offload = false;
     // LRO is enabled
     bool rx_lro = false;
     // Enable tx TCP segment offload
@@ -83,6 +87,19 @@ struct hw_features {
     uint16_t mtu = 1500;
     // Maximun packet len when TCP/UDP offload is enabled
     uint16_t max_packet_len = ip_packet_len_max - eth_hdr_len;
+
+    /// \return TRUE if all Rx csum features are enabled
+    bool rx_csum_offload() const noexcept {
+        return rx_csum_ipv4_offload && rx_csum_tcp_offload && rx_csum_udp_offload;
+    }
+
+    /// Set all Rx csum offload parameters to the given value
+    /// \param csum value to set
+    void set_rx_csum_offload(bool csum) noexcept {
+        rx_csum_ipv4_offload = csum;
+        rx_csum_tcp_offload = csum;
+        rx_csum_udp_offload = csum;
+    }
 };
 
 class l3_protocol {

@@ -1561,25 +1561,25 @@ int dpdk_device::init_port_start()
 #endif
         printf("LRO is off\n");
 
-    // Check that all CSUM features are either all set all together or not set
-    // all together. If this assumption breaks we need to rework the below logic
-    // by splitting the csum offload feature bit into separate bits for IPv4,
-    // TCP and UDP.
-    assert(((_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) &&
-            (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) &&
-            (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM)) ||
-           (!(_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) &&
-            !(_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) &&
-            !(_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM)));
-
     // Set Rx checksum checking
-    if (  (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) &&
-          (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) &&
-          (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM)) {
-        printf("RX checksum offload supported\n");
-        port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_CHECKSUM;
-        _hw_features.rx_csum_offload = 1;
+    if (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) {
+        printf("IPv4 RX checksum offload supported\n");
+        port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_IPV4_CKSUM;
+        _hw_features.rx_csum_ipv4_offload = 1;
     }
+
+    if (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) {
+        printf("UDP RX checksum offload supported\n");
+        port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_UDP_CKSUM;
+        _hw_features.rx_csum_udp_offload = 1;
+    }
+
+    if (_dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM) {
+        printf("TCP RX checksum offload supported\n");
+        port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TCP_CKSUM;
+        _hw_features.rx_csum_tcp_offload = 1;
+    }
+
 
     if ((_dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
         printf("TX ip checksum offload supported\n");
@@ -2173,7 +2173,8 @@ void dpdk_qp<HugetlbfsMemBackend>::process_packets(
             oi.vlan_tci = m->vlan_tci;
         }
 
-        if (_dev->hw_features().rx_csum_offload) {
+        const net::hw_features& hw_features = _dev->hw_features_ref();
+        if (hw_features.rx_csum_ipv4_offload || hw_features.rx_csum_tcp_offload || hw_features.rx_csum_udp_offload) {
             if (m->ol_flags & (PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD)) {
                 // Packet with bad checksum, just drop it.
                 _stats.rx.bad.inc_csum_err();
