@@ -1318,7 +1318,7 @@ private:
     static bool refill_rx_mbuf(rte_mbuf* m, size_t size = mbuf_data_size) {
         char* data;
 
-        if (posix_memalign((void**)&data, size, size)) {
+        if (posix_memalign((void**)&data, size, size + RTE_PKTMBUF_HEADROOM)) {
             return false;
         }
 
@@ -1331,8 +1331,9 @@ private:
         // points to the private data of RTE_PKTMBUF_HEADROOM before the
         // actual data buffer.
         //
-        m->buf_addr      = data - RTE_PKTMBUF_HEADROOM;
-        m->buf_iova      = iova - RTE_PKTMBUF_HEADROOM;
+        m->buf_addr      = data;
+        m->buf_iova      = iova;
+
         return true;
     }
 
@@ -1411,7 +1412,7 @@ private:
     std::vector<rte_mbuf*> _rx_free_pkts;
     std::vector<rte_mbuf*> _rx_free_bufs;
     std::vector<fragment> _frags;
-    std::vector<char*> _bufs;
+    std::vector<void*> _bufs;
     size_t _num_rx_free_segs = 0;
     reactor::poller _rx_gc_poller;
     std::unique_ptr<void, free_deleter> _rx_xmem;
@@ -2061,7 +2062,7 @@ dpdk_qp<true>::from_mbuf_lro(rte_mbuf* m)
         char* data = rte_pktmbuf_mtod(m, char*);
 
         _frags.emplace_back(fragment{data, rte_pktmbuf_data_len(m)});
-        _bufs.push_back(data);
+        _bufs.push_back(m->buf_addr);
     }
 
     return packet(_frags.begin(), _frags.end(),
@@ -2079,11 +2080,12 @@ inline compat::optional<packet> dpdk_qp<true>::from_mbuf(rte_mbuf* m)
     _rx_free_pkts.push_back(m);
     _num_rx_free_segs += m->nb_segs;
 
+    // FIXME: if functions below throw buffers pointed by rte_mbuf::buf_addr are going to leak. This requires fixing.
+
     if (!_dev->hw_features_ref().rx_lro || rte_pktmbuf_is_contiguous(m)) {
         char* data = rte_pktmbuf_mtod(m, char*);
 
-        return packet(fragment{data, rte_pktmbuf_data_len(m)},
-                      make_free_deleter(data));
+        return packet(fragment{data, rte_pktmbuf_data_len(m)}, make_free_deleter(m->buf_addr));
     } else {
         return from_mbuf_lro(m);
     }
