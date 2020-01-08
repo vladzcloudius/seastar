@@ -1010,11 +1010,13 @@ build_mbuf_cluster:
         void set_zc_info(void* va, rte_iova_t iova, size_t len) {
             rte_pktmbuf_attach_extbuf(rte_mbuf_p(), va, iova, len, shinfo_p());
 
+            _mbuf.data_len           = len;
+            _mbuf.pkt_len            = len;
+            _is_zc                   = true;
+
             // Bump the refcount to two so that rte_pktmbuf_free() won't call the
             // free_cb on the buffer. We will free the buffer ourselves.
             rte_mbuf_ext_refcnt_set(shinfo_p(), 2);
-
-            _is_zc = true;
         }
 
         void reset_zc() {
