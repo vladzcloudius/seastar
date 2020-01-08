@@ -999,25 +999,22 @@ build_mbuf_cluster:
             return len;
         }
 
-    public:
-        tx_buf(tx_buf_factory& fc) : _fc(fc) {
+        static void assert_on_free(void* addr, void*) { rte_exit(EXIT_FAILURE, "Attempted to free external Tx buffer %p. Something is terribly wrong!\n", addr); }
 
-            _buf_iova     = _mbuf.buf_iova;
-            _data_off     = _mbuf.data_off;
-        }
+    public:
+        tx_buf(tx_buf_factory& fc) : _fc(fc) {}
 
         rte_mbuf* rte_mbuf_p() { return &_mbuf; }
+        rte_mbuf_ext_shared_info* shinfo_p() noexcept { return &_shinfo; }
 
         void set_zc_info(void* va, rte_iova_t iova, size_t len) {
-            // mbuf_put()
-            _mbuf.data_len           = len;
-            _mbuf.pkt_len            = len;
+            rte_pktmbuf_attach_extbuf(rte_mbuf_p(), va, iova, len, shinfo_p());
 
-            // Set the mbuf to point to our data
-            _mbuf.buf_addr           = va;
-            _mbuf.buf_iova           = iova;
-            _mbuf.data_off           = 0;
-            _is_zc                   = true;
+            // Bump the refcount to two so that rte_pktmbuf_free() won't call the
+            // free_cb on the buffer. We will free the buffer ourselves.
+            rte_mbuf_ext_refcnt_set(shinfo_p(), 2);
+
+            _is_zc = true;
         }
 
         void reset_zc() {
@@ -1038,12 +1035,7 @@ build_mbuf_cluster:
                 return;
             }
 
-            // Restore the rte_mbuf fields we trashed in set_zc_info()
-            _mbuf.buf_iova     = _buf_iova;
-            _mbuf.buf_addr     = rte_mbuf_to_baddr(&_mbuf);
-            _mbuf.data_off     = _data_off;
-
-            _is_zc             = false;
+            _is_zc = false;
         }
 
         void recycle() {
@@ -1065,8 +1057,7 @@ build_mbuf_cluster:
         struct rte_mbuf _mbuf;
         MARKER private_start;
         compat::optional<packet> _p;
-        rte_iova_t _buf_iova;
-        uint16_t _data_off;
+        rte_mbuf_ext_shared_info _shinfo = { assert_on_free, nullptr, { 1 } };
         // TRUE if underlying mbuf has been used in the zero-copy flow
         bool _is_zc = false;
         // buffers' factory the buffer came from
