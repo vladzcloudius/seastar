@@ -2052,6 +2052,9 @@ dpdk_qp<true>::from_mbuf_lro(rte_mbuf* m)
     _frags.clear();
     _bufs.clear();
 
+    _frags.reserve(m->nb_segs);
+    _bufs.reserve(m->nb_segs);
+
     for (; m != nullptr; m = m->next) {
         char* data = rte_pktmbuf_mtod(m, char*);
 
