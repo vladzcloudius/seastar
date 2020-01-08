@@ -2073,13 +2073,14 @@ inline compat::optional<packet> dpdk_qp<true>::from_mbuf(rte_mbuf* m)
 
     if (!_dev->hw_features_ref().rx_lro || rte_pktmbuf_is_contiguous(m)) {
         char* data = rte_pktmbuf_mtod(m, char*);
+        uint16_t data_len = rte_pktmbuf_data_len(m);
 
         // Bump the refcount to two so that rte_pktmbuf_detach_extbuf() won't call the
         // free_cb on the buffer. We will free the buffer ourselves.
         rte_mbuf_ext_refcnt_set(m->shinfo, 2);
         rte_pktmbuf_detach_extbuf(m);
 
-        return packet(fragment{data, rte_pktmbuf_data_len(m)}, make_free_deleter(data));
+        return packet(fragment{data, data_len}, make_free_deleter(data));
     } else {
         return from_mbuf_lro(m);
     }
