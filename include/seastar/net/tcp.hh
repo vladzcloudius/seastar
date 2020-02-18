@@ -862,7 +862,7 @@ void tcp<InetTraits>::received(packet p, ipaddr from, ipaddr to) {
         return;
     }
 
-    if (!hw_features().rx_csum_offload) {
+    if (!hw_features().rx_csum_tcp_offload) {
         checksummer csum;
         InetTraits::tcp_pseudo_header_checksum(csum, from, to, p.len());
         csum.sum(p);

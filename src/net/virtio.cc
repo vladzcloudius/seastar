@@ -83,10 +83,10 @@ private:
         if (!(_opts.count("csum-offload") && _opts["csum-offload"].as<std::string>() == "off")) {
             seastar_supported_features |= VIRTIO_NET_F_CSUM | VIRTIO_NET_F_GUEST_CSUM;
             _hw_features.tx_csum_l4_offload = true;
-            _hw_features.rx_csum_offload = true;
+            _hw_features.set_rx_csum_offload(true);
         } else {
             _hw_features.tx_csum_l4_offload = false;
-            _hw_features.rx_csum_offload = false;
+            _hw_features.set_rx_csum_offload(false);
         }
         if (!(_opts.count("tso") && _opts["tso"].as<std::string>() == "off")) {
             seastar_supported_features |= VIRTIO_NET_F_HOST_TSO4;
@@ -847,7 +847,7 @@ qp_vhost::qp_vhost(device *dev, boost::program_options::variables_map opts)
     tap_fd.ioctl(TUNSETIFF, ifr);
     unsigned int offload = 0;
     auto hw_features = _dev->hw_features();
-    if (hw_features.tx_csum_l4_offload && hw_features.rx_csum_offload) {
+    if (hw_features.tx_csum_l4_offload && hw_features.rx_csum_offload()) {
         offload = TUN_F_CSUM;
         if (hw_features.tx_tso) {
             offload |= TUN_F_TSO4;
