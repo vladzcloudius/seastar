@@ -1125,7 +1125,7 @@ class DiskPerfTuner(PerfTunerBase):
     def __get_phys_devices(self, udev_obj):
         # if device is a virtual device - the underlying physical devices are going to be its slaves
         if re.search(r'virtual', udev_obj.sys_path):
-            return list(itertools.chain.from_iterable([ self.__get_phys_devices(pyudev.Devices.from_device_file(self.__pyudev_ctx, "/dev/{}".format(slave))) for slave in os.listdir(os.path.join(udev_obj.sys_path, 'slaves')) ]))
+            return [ pyudev.Devices.from_device_file(self.__pyudev_ctx, "/dev/{}".format(slave)).sys_name for slave in os.listdir(os.path.join(udev_obj.sys_path, 'slaves')) ]
         else:
             # device node is something like /dev/sda1 - we need only the part without /dev/
             return [ re.match(r'/dev/(\S+\d*)', udev_obj.device_node).group(1) ]
@@ -1142,7 +1142,14 @@ class DiskPerfTuner(PerfTunerBase):
 
                 udev_obj = pyudev.Devices.from_device_file(self.__pyudev_ctx, "/dev/{}".format(device))
                 dev_sys_path = udev_obj.sys_path
-                split_sys_path = list(pathlib.PurePath(dev_sys_path).parts)
+                #print("udev_obj: {}".format(pyudev.Devices.from_device_number(pyudev.Context(), 'nvme-subsystem', udev_obj.device_number)))
+                # print("udev_obj: {}".format(pyudev.Devices.from_name(pyudev.Context(), 'nvme-subsystem', device)))
+                if re.search(r'virtual', udev_obj.sys_path):
+                    m = re.match(r'(nvme\d+)\S*', device)
+                    if m:
+                        dev_sys_path = "{}/device/{}".format(udev_obj.sys_path, m.group(1))
+
+                split_sys_path = list(pathlib.PurePath(pathlib.Path(dev_sys_path).resolve()).parts)
 
                 # first part is always /sys/devices/pciXXX ...
                 controller_path_parts = split_sys_path[0:4]
@@ -1236,7 +1243,7 @@ class DiskPerfTuner(PerfTunerBase):
         # ...with one or more schedulers where currently selected scheduler is the one in brackets.
         #
         # Return the scheduler with the highest priority among those that are supported for the current device.
-        supported_schedulers = frozenset([scheduler.lstrip("[").rstrip("]") for scheduler in lines[0].split(" ")])
+        supported_schedulers = frozenset([scheduler.lstrip("[").rstrip("]").rstrip("\n") for scheduler in lines[0].split(" ")])
         return next((scheduler for scheduler in self.__io_schedulers if scheduler in supported_schedulers), None)
 
     def __tune_disk(self, device):
