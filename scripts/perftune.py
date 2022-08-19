@@ -1511,6 +1511,7 @@ argp.add_argument('--nic', action='append', help='network interface name(s), by 
 argp.add_argument('--tune-clock', action='store_true', help='Force tuning of the system clocksource')
 argp.add_argument('--get-cpu-mask', action='store_true', help="print the CPU mask to be used for compute")
 argp.add_argument('--get-cpu-mask-quiet', action='store_true', help="print the CPU mask to be used for compute, print the zero CPU set if that's what it turns out to be")
+argp.add_argument('--get-irq-cpu-mask', action='store_true', help="print the CPU mask to be used for IRQs binding")
 argp.add_argument('--verbose', action='store_true', help="be more verbose about operations and their result")
 argp.add_argument('--tune', choices=TuneModes.names(), help="components to configure (may be given more than once)", action='append', default=[])
 argp.add_argument('--cpu-mask', help="mask of cores to use, by default use all available cores", metavar='MASK')
@@ -1692,6 +1693,8 @@ try:
     if args.get_cpu_mask or args.get_cpu_mask_quiet:
         # Print the compute mask from the first tuner - it's going to be the same in all of them
         perftune_print(tuners[0].compute_cpu_mask)
+    elif args.get_irq_cpu_mask:
+        perftune_print(tuners[0].irqs_cpu_mask)
     else:
         # Tune the system
         restart_irqbalance(itertools.chain.from_iterable([ tuner.irqs for tuner in tuners ]))
